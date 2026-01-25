@@ -13,6 +13,7 @@ import type { TrustedAssertion, TrustProvider } from '@/lib/types';
 
 /**
  * Parse a kind 10040 event to extract trust providers
+ * Only includes secure (wss://) relays
  */
 function parseTrustProviders(event: NostrEvent): TrustProvider[] {
   const providers: TrustProvider[] = [];
@@ -20,6 +21,14 @@ function parseTrustProviders(event: NostrEvent): TrustProvider[] {
   for (const tag of event.tags) {
     // Format: ["30382:rank", "<pubkey>", "<relay>"]
     if (tag[0]?.includes(':') && tag.length >= 3) {
+      const relay = tag[2];
+      
+      // Only accept secure WebSocket relays (wss://)
+      if (!relay.startsWith('wss://')) {
+        console.warn(`Skipping insecure relay in kind 10040: ${relay}`);
+        continue;
+      }
+      
       providers.push({
         service: tag[0],
         pubkey: tag[1],
