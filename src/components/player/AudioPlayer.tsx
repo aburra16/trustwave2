@@ -18,6 +18,7 @@ import { Slider } from '@/components/ui/slider';
 import { usePlayer } from '@/contexts/PlayerContext';
 import { usePublishReaction } from '@/hooks/useReaction';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
+import { BoostDialog } from './BoostDialog';
 import { KINDS } from '@/lib/constants';
 
 function formatTime(seconds: number): string {
@@ -208,14 +209,16 @@ export function AudioPlayer() {
           )}
           
           {/* Boost Button */}
-          <Button
-            variant="outline"
-            size="sm"
-            className="hidden md:flex items-center gap-1.5 border-tw-orange/50 text-tw-orange hover:bg-tw-orange/10"
-          >
-            <Zap className="w-4 h-4" />
-            <span>Boost</span>
-          </Button>
+          <BoostDialog>
+            <Button
+              variant="outline"
+              size="sm"
+              className="hidden md:flex items-center gap-1.5 border-tw-orange/50 text-tw-orange hover:bg-tw-orange/10"
+            >
+              <Zap className="w-4 h-4" />
+              <span>Boost</span>
+            </Button>
+          </BoostDialog>
           
           {/* Expand Toggle */}
           <Button
@@ -308,14 +311,16 @@ export function AudioPlayer() {
                 </div>
               )}
               
-              <Button
-                variant="outline"
-                size="sm"
-                className="border-tw-orange/50 text-tw-orange hover:bg-tw-orange/10"
-              >
-                <Zap className="w-4 h-4 mr-1.5" />
-                Boost
-              </Button>
+              <BoostDialog>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="border-tw-orange/50 text-tw-orange hover:bg-tw-orange/10"
+                >
+                  <Zap className="w-4 h-4 mr-1.5" />
+                  Boost
+                </Button>
+              </BoostDialog>
             </div>
           </div>
         )}
