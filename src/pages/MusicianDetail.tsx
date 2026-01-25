@@ -5,111 +5,103 @@ import { MainLayout } from '@/components/layout/MainLayout';
 import { Button } from '@/components/ui/button';
 import { SongCard } from '@/components/songs/SongCard';
 import { Skeleton } from '@/components/ui/skeleton';
-import { usePodcastIndexEpisodes, usePodcastIndexFeed } from '@/hooks/usePodcastIndex';
-import { usePodcastIndexFeedByGuid, usePodcastIndexFeedByName } from '@/hooks/usePodcastIndexByGuid';
+import { usePodcastIndexEpisodes } from '@/hooks/usePodcastIndex';
 import { useMusiciansList } from '@/hooks/useDecentralizedList';
 import { usePublishReaction } from '@/hooks/useReaction';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
+import { getArtistEntries } from '@/lib/musicianUtils';
 import { cn } from '@/lib/utils';
 import { APP_NAME, KINDS } from '@/lib/constants';
 import type { ScoredListItem } from '@/lib/types';
 
 export default function MusicianDetail() {
-  const { feedId: urlFeedId } = useParams<{ feedId: string }>();
+  const { artistSlug } = useParams<{ artistSlug: string }>();
   const { user } = useCurrentUser();
   
-  // Find the musician from the list by feedGuid (podcast GUID) or feedId
-  const { data: musicians, isLoading: loadingMusicians } = useMusiciansList();
-  const musician = musicians?.find(m => 
-    m.feedGuid === urlFeedId || 
-    m.musicianFeedGuid === urlFeedId ||
-    m.feedId === urlFeedId ||
-    String(m.feedId) === urlFeedId
-  );
+  // Decode the artist name from the URL slug
+  const artistName = decodeURIComponent(artistSlug || '').replace(/-/g, ' ');
+  
+  // Get ALL musician entries for this artist (could be multiple albums/feeds)
+  const { data: allMusicians, isLoading: loadingMusicians } = useMusiciansList();
+  const artistEntries = allMusicians ? getArtistEntries(allMusicians, artistName) : [];
+  
+  // Use the primary entry (highest score) for metadata
+  const primaryMusician = artistEntries.sort((a, b) => b.score - a.score)[0];
+  
+  // Aggregate stats across all entries
+  const totalUpvotes = artistEntries.reduce((sum, e) => sum + e.upvotes, 0);
+  const totalDownvotes = artistEntries.reduce((sum, e) => sum + e.downvotes, 0);
+  const userReaction = artistEntries.find(e => e.userReaction)?.userReaction || null;
   
   console.log('MusicianDetail:', { 
-    urlFeedId, 
-    musician,
-    musicianFeedId: musician?.feedId,
-    musicianFeedGuid: musician?.feedGuid,
+    artistSlug,
+    artistName,
+    entriesFound: artistEntries.length,
+    feedIds: artistEntries.map(e => e.feedId),
   });
   
-  // Determine which ID to use for fetching
-  const isGuid = urlFeedId?.includes('-'); // GUIDs have dashes
-  const numericFeedId = musician?.feedId;
-  const artistName = musician?.musicianName || musician?.name;
+  // Fetch episodes from ALL feeds for this artist
+  const episodeQueries = artistEntries
+    .filter(e => e.feedId)
+    .map(entry => ({
+      feedId: entry.feedId!,
+      query: usePodcastIndexEpisodes(entry.feedId),
+    }));
   
-  // Try multiple fallback strategies:
-  // 1. Use stored numeric feedId (best)
-  // 2. Look up by feedGuid
-  // 3. Look up by artist name (last resort)
-  const { data: feedByGuid } = usePodcastIndexFeedByGuid(
-    isGuid && !numericFeedId && urlFeedId ? urlFeedId : undefined
-  );
+  // Combine all episodes from all feeds
+  const allEpisodes = episodeQueries.flatMap(q => q.query.data || []);
+  const isLoadingEpisodes = episodeQueries.some(q => q.query.isLoading);
   
-  const { data: feedByName } = usePodcastIndexFeedByName(
-    !numericFeedId && !feedByGuid && artistName ? artistName : undefined
-  );
-  
-  // Use numeric ID from musician, or from lookups, or try the URL param
-  const actualFeedId = numericFeedId || feedByGuid?.id || feedByName?.id || (!isGuid ? urlFeedId : undefined);
-  
-  // Fetch feed data and episodes from Podcast Index using numeric ID
-  const { data: feed } = usePodcastIndexFeed(actualFeedId);
-  const { data: episodes, isLoading: loadingEpisodes } = usePodcastIndexEpisodes(actualFeedId);
-  
-  console.log('Lookup chain:', {
-    urlFeedId,
-    numericFeedId: musician?.feedId,
-    feedByGuid: feedByGuid?.id,
-    feedByName: feedByName?.id,
-    actualFeedId,
-  });
-  console.log('Fetched episodes:', episodes?.length, 'episodes');
+  console.log('Fetching from feeds:', artistEntries.map(e => e.feedId));
+  console.log('Total episodes across all feeds:', allEpisodes.length);
   
   const { mutate: publishReaction, isPending: isReacting } = usePublishReaction();
   
   useSeoMeta({
-    title: `${musician?.musicianName || feed?.title || 'Artist'} | ${APP_NAME}`,
-    description: feed?.description || `Listen to music from ${musician?.musicianName || 'this artist'}`,
+    title: `${artistName} | ${APP_NAME}`,
+    description: `Listen to music from ${artistName}`,
   });
   
   const handleReaction = (reaction: '+' | '-') => {
-    if (!user || !musician) return;
+    if (!user || !primaryMusician) return;
     
+    // React to the primary entry (highest scored)
     publishReaction({
-      targetEventId: musician.id,
-      targetPubkey: musician.pubkey,
-      targetKind: musician.event.kind || KINDS.LIST_ITEM,
+      targetEventId: primaryMusician.id,
+      targetPubkey: primaryMusician.pubkey,
+      targetKind: primaryMusician.event.kind || KINDS.LIST_ITEM,
       reaction,
-      currentReaction: musician.userReaction,
+      currentReaction: userReaction,
     });
   };
   
-  const name = musician?.musicianName || feed?.author || feed?.title || 'Unknown Artist';
-  const artwork = musician?.musicianArtwork || feed?.artwork || feed?.image;
-  const description = musician?.description || feed?.description;
+  const artwork = primaryMusician?.musicianArtwork || primaryMusician?.songArtwork;
+  const description = primaryMusician?.description;
   
-  // Convert episodes to ScoredListItem format for the player
-  const songs: ScoredListItem[] = episodes?.map(ep => ({
+  // Convert all episodes to ScoredListItem format for the player
+  const songs: ScoredListItem[] = allEpisodes.map(ep => ({
     id: ep.guid,
-    pubkey: musician?.pubkey || '',
-    listATag: musician?.listATag || '',
+    pubkey: primaryMusician?.pubkey || '',
+    listATag: primaryMusician?.listATag || '',
     songGuid: ep.guid,
     songTitle: ep.title,
-    songArtist: name,
+    songArtist: artistName,
     songUrl: ep.enclosureUrl,
     songArtwork: ep.image || ep.feedImage || artwork,
     songDuration: ep.duration,
     feedId: String(ep.feedId),
     feedGuid: ep.podcastGuid,
     createdAt: ep.datePublished,
-    event: musician?.event || {} as any,
+    event: primaryMusician?.event || {} as any,
     score: 0,
     upvotes: 0,
     downvotes: 0,
     userReaction: null,
-  })) || [];
+  }))
+  // Sort by date published (most recent first)
+  .sort((a, b) => b.createdAt - a.createdAt);
+  
+  const isLoading = loadingMusicians || isLoadingEpisodes;
   
   if (loadingMusicians) {
     return (
@@ -123,15 +115,15 @@ export default function MusicianDetail() {
     );
   }
   
-  if (!musician && !loadingMusicians) {
+  if (artistEntries.length === 0 && !loadingMusicians) {
     return (
       <MainLayout>
         <div className="container mx-auto px-4 py-8">
           <div className="text-center py-20">
             <Music className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
-            <h2 className="text-xl font-semibold mb-2">Musician Not Found</h2>
+            <h2 className="text-xl font-semibold mb-2">Artist Not Found</h2>
             <p className="text-muted-foreground mb-6">
-              This musician hasn't been added to the list yet.
+              This artist hasn't been added to the list yet.
             </p>
             <Button asChild>
               <Link to="/musicians">Back to Musicians</Link>
@@ -168,7 +160,7 @@ export default function MusicianDetail() {
             {/* Artwork */}
             <div className="w-48 h-48 rounded-xl overflow-hidden bg-secondary flex-shrink-0 shadow-2xl">
               {artwork ? (
-                <img src={artwork} alt={name} className="w-full h-full object-cover" />
+                <img src={artwork} alt={artistName} className="w-full h-full object-cover" />
               ) : (
                 <div className="w-full h-full bg-gradient-to-br from-tw-purple/20 to-tw-cyan/20 flex items-center justify-center">
                   <Music className="w-20 h-20 text-muted-foreground/30" />
@@ -178,32 +170,37 @@ export default function MusicianDetail() {
             
             {/* Info */}
             <div className="flex-1">
-              <h1 className="text-4xl font-bold mb-2">{name}</h1>
+              <h1 className="text-4xl font-bold mb-2">{artistName}</h1>
               {description && (
                 <p className="text-muted-foreground mb-4 max-w-2xl">
                   {description}
                 </p>
               )}
               
+              {/* Release count */}
+              {artistEntries.length > 1 && (
+                <p className="text-sm text-muted-foreground mb-4">
+                  {artistEntries.length} releases • {songs.length} tracks
+                </p>
+              )}
+              
               <div className="flex flex-wrap items-center gap-4">
-                {/* Score */}
-                {musician && (
-                  <div className="flex items-center gap-4">
-                    <div className="flex items-center gap-2">
-                      <ThumbsUp className="w-5 h-5 text-tw-success" />
-                      <span className="font-semibold">{musician.upvotes}</span>
-                    </div>
-                    {musician.downvotes > 0 && (
-                      <div className="flex items-center gap-2 text-muted-foreground">
-                        <ThumbsDown className="w-5 h-5" />
-                        <span>{musician.downvotes}</span>
-                      </div>
-                    )}
+                {/* Aggregated Score */}
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-2">
+                    <ThumbsUp className="w-5 h-5 text-tw-success" />
+                    <span className="font-semibold">{totalUpvotes}</span>
                   </div>
-                )}
+                  {totalDownvotes > 0 && (
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <ThumbsDown className="w-5 h-5" />
+                      <span>{totalDownvotes}</span>
+                    </div>
+                  )}
+                </div>
                 
                 {/* Actions */}
-                {user && musician && (
+                {user && primaryMusician && (
                   <>
                     <Button
                       variant="outline"
@@ -211,12 +208,12 @@ export default function MusicianDetail() {
                       onClick={() => handleReaction('+')}
                       disabled={isReacting}
                       className={cn(
-                        musician.userReaction === '+' && 'border-tw-success text-tw-success'
+                        userReaction === '+' && 'border-tw-success text-tw-success'
                       )}
                     >
                       <ThumbsUp className={cn(
                         'w-4 h-4 mr-1.5',
-                        musician.userReaction === '+' && 'fill-current'
+                        userReaction === '+' && 'fill-current'
                       )} />
                       Upvote
                     </Button>
@@ -226,30 +223,16 @@ export default function MusicianDetail() {
                       onClick={() => handleReaction('-')}
                       disabled={isReacting}
                       className={cn(
-                        musician.userReaction === '-' && 'border-destructive text-destructive'
+                        userReaction === '-' && 'border-destructive text-destructive'
                       )}
                     >
                       <ThumbsDown className={cn(
                         'w-4 h-4 mr-1.5',
-                        musician.userReaction === '-' && 'fill-current'
+                        userReaction === '-' && 'fill-current'
                       )} />
                       Downvote
                     </Button>
                   </>
-                )}
-                
-                {/* RSS Feed Link */}
-                {(musician?.musicianFeedUrl || feed?.url) && (
-                  <Button variant="ghost" size="sm" asChild>
-                    <a 
-                      href={musician?.musicianFeedUrl || feed?.url} 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                    >
-                      <ExternalLink className="w-4 h-4 mr-1.5" />
-                      RSS Feed
-                    </a>
-                  </Button>
                 )}
               </div>
             </div>
@@ -258,9 +241,16 @@ export default function MusicianDetail() {
         
         {/* Episodes/Songs */}
         <div>
-          <h2 className="text-2xl font-bold mb-6">Tracks</h2>
+          <h2 className="text-2xl font-bold mb-6">
+            Tracks
+            {artistEntries.length > 1 && (
+              <span className="text-sm font-normal text-muted-foreground ml-2">
+                from {artistEntries.length} releases
+              </span>
+            )}
+          </h2>
           
-          {loadingEpisodes ? (
+          {isLoadingEpisodes ? (
             <div className="space-y-2">
               {Array.from({ length: 5 }).map((_, i) => (
                 <div key={i} className="flex items-center gap-4 p-3">

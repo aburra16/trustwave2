@@ -6,6 +6,7 @@ import { MusicianCard } from '@/components/musicians/MusicianCard';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useMusiciansList } from '@/hooks/useDecentralizedList';
+import { groupMusiciansByArtist } from '@/lib/musicianUtils';
 import { cn } from '@/lib/utils';
 import { APP_NAME } from '@/lib/constants';
 
@@ -20,13 +21,16 @@ export default function Musicians() {
   const { data: musicians, isLoading, error } = useMusiciansList();
   const [sortBy, setSortBy] = useState<SortOption>('score');
   
+  // Group musicians by artist name (aggregates multiple albums/feeds)
+  const groupedMusicians = musicians ? groupMusiciansByArtist(musicians) : [];
+  
   // Sort musicians
-  const sortedMusicians = musicians ? [...musicians].sort((a, b) => {
+  const sortedMusicians = groupedMusicians.sort((a, b) => {
     if (sortBy === 'score') {
       return b.score - a.score;
     }
     return b.createdAt - a.createdAt;
-  }) : [];
+  });
   
   return (
     <MainLayout>
@@ -41,7 +45,7 @@ export default function Musicians() {
               Musicians
             </h1>
             <p className="text-muted-foreground mt-1">
-              {musicians?.length || 0} artists curated by your trusted network
+              {sortedMusicians.length || 0} artists with {musicians?.length || 0} releases curated by your trusted network
             </p>
           </div>
           
