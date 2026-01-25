@@ -113,14 +113,13 @@ export function useTrustMap() {
       if (!providers || providers.length === 0) {
         console.log('No trust providers found, using genesis curator fallback');
         // Fallback: use genesis curator as trust source
-        // Try primary relay first
         trustMap = await fetchTrustAssertions(GENESIS_CURATOR_PUBKEY, NIP85_RELAY);
         
-        // If no data, try fallback relay
-        if (trustMap.size === 0) {
-          console.log('Primary relay had no data, trying fallback relay...');
-          trustMap = await fetchTrustAssertions(GENESIS_CURATOR_PUBKEY, NIP85_FALLBACK_RELAY);
-        }
+        // TODO: Add fallback relay once it's configured with wss:// (not ws://)
+        // if (trustMap.size === 0) {
+        //   console.log('Primary relay had no data, trying fallback relay...');
+        //   trustMap = await fetchTrustAssertions(GENESIS_CURATOR_PUBKEY, NIP85_FALLBACK_RELAY);
+        // }
         
         return trustMap;
       }
