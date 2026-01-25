@@ -5,9 +5,7 @@ import { MainLayout } from '@/components/layout/MainLayout';
 import { Button } from '@/components/ui/button';
 import { SongCard } from '@/components/songs/SongCard';
 import { Skeleton } from '@/components/ui/skeleton';
-import { usePodcastIndexEpisodes } from '@/hooks/usePodcastIndex';
-import { usePodcastIndexFeedByGuid } from '@/hooks/usePodcastIndexByGuid';
-import { useMusiciansList } from '@/hooks/useDecentralizedList';
+import { useSongsList, useMusiciansList } from '@/hooks/useDecentralizedList';
 import { usePublishReaction } from '@/hooks/useReaction';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { getArtistEntries } from '@/lib/musicianUtils';
@@ -22,8 +20,10 @@ export default function MusicianDetail() {
   // Decode the artist name from the URL slug
   const artistName = decodeURIComponent(artistSlug || '').replace(/-/g, ' ');
   
-  // Get ALL musician entries for this artist (could be multiple albums/feeds)
+// Get ALL musician entries for this artist (could be multiple albums/feeds)
   const { data: allMusicians, isLoading: loadingMusicians } = useMusiciansList();
+  const { data: allSongs, isLoading: loadingSongs } = useSongsList();
+  
   const artistEntries = allMusicians ? getArtistEntries(allMusicians, artistName) : [];
   
   // Use the primary entry (highest score) for metadata
@@ -41,45 +41,14 @@ export default function MusicianDetail() {
     feedIds: artistEntries.map(e => e.feedId),
   });
   
-  // Fetch episodes from ALL feeds for this artist
-  // For entries without feedId, we need to look up by feedGuid first
-  const entriesWithFeedId = artistEntries.filter(e => e.feedId);
-  const entriesWithoutFeedId = artistEntries.filter(e => !e.feedId && (e.feedGuid || e.musicianFeedGuid));
+  // Filter songs list to only show songs by this artist
+  const artistSongs = allSongs?.filter(song => 
+    (song.songArtist || '').toLowerCase() === artistName.toLowerCase()
+  ) || [];
   
-  console.log('Entries with feedId:', entriesWithFeedId.length);
-  console.log('Entries needing GUID lookup:', entriesWithoutFeedId.length);
+  console.log(`Found ${artistSongs.length} songs in the songs list for ${artistName}`);
   
-  // Fetch episodes for entries that have feedId
-  const episodeQueries = entriesWithFeedId.map(entry => ({
-    feedId: entry.feedId!,
-    query: usePodcastIndexEpisodes(entry.feedId),
-  }));
-  
-  // For entries without feedId, look up by GUID to get feedId, then fetch episodes
-  const guidLookups = entriesWithoutFeedId.map(entry => {
-    const guid = entry.feedGuid || entry.musicianFeedGuid;
-    return {
-      guid,
-      lookup: usePodcastIndexFeedByGuid(guid),
-    };
-  });
-  
-  // Now fetch episodes for the looked-up feeds
-  const additionalEpisodeQueries = guidLookups
-    .filter(lookup => lookup.lookup.data?.id)
-    .map(lookup => ({
-      feedId: lookup.lookup.data!.id,
-      query: usePodcastIndexEpisodes(lookup.lookup.data!.id),
-    }));
-  
-  const allEpisodeQueries = [...episodeQueries, ...additionalEpisodeQueries];
-  
-  // Combine all episodes from all feeds
-  const allEpisodes = allEpisodeQueries.flatMap(q => q.query.data || []);
-  const isLoadingEpisodes = allEpisodeQueries.some(q => q.query.isLoading) || guidLookups.some(l => l.lookup.isLoading);
-  
-  console.log('Fetching from feeds:', allEpisodeQueries.map(q => q.feedId));
-  console.log('Total episodes across all feeds:', allEpisodes.length);
+  const isLoadingEpisodes = loadingSongs;
   
   const { mutate: publishReaction, isPending: isReacting } = usePublishReaction();
   
@@ -104,30 +73,8 @@ export default function MusicianDetail() {
   const artwork = primaryMusician?.musicianArtwork || primaryMusician?.songArtwork;
   const description = primaryMusician?.description;
   
-  // Convert all episodes to ScoredListItem format for the player
-  // NOTE: These are NOT Nostr events, just Podcast Index episodes
-  // They can be played but not voted on (no event.id)
-  const songs: ScoredListItem[] = allEpisodes.map(ep => ({
-    id: `episode-${ep.guid}`, // Prefix to distinguish from Nostr event IDs
-    pubkey: primaryMusician?.pubkey || '',
-    listATag: primaryMusician?.listATag || '',
-    songGuid: ep.guid,
-    songTitle: ep.title,
-    songArtist: artistName,
-    songUrl: ep.enclosureUrl,
-    songArtwork: ep.image || ep.feedImage || artwork,
-    songDuration: ep.duration,
-    feedId: String(ep.feedId),
-    feedGuid: ep.podcastGuid,
-    createdAt: ep.datePublished,
-    event: {} as any, // No event - this is just from Podcast Index
-    score: 0,
-    upvotes: 0,
-    downvotes: 0,
-    userReaction: null,
-  }))
-  // Sort by date published (most recent first)
-  .sort((a, b) => b.createdAt - a.createdAt);
+  // Use songs from the songs list (these are votable Nostr events)
+  const songs = artistSongs.sort((a, b) => b.createdAt - a.createdAt);
   
   const isLoading = loadingMusicians || isLoadingEpisodes;
   
