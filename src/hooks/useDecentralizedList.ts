@@ -99,6 +99,8 @@ async function fetchReactions(itemIds: string[]): Promise<Map<string, NostrEvent
   
   if (itemIds.length === 0) return reactionsMap;
   
+  console.log(`Fetching reactions for ${itemIds.length} items from ${DCOSL_RELAY}`);
+  
   const relay = new NRelay1(DCOSL_RELAY);
   
   try {
@@ -107,6 +109,11 @@ async function fetchReactions(itemIds: string[]): Promise<Map<string, NostrEvent
       '#e': itemIds,
       limit: 2000,
     }]);
+    
+    console.log(`Fetched ${events.length} total reactions`);
+    if (events.length > 0) {
+      console.log('Sample reaction:', events[0]);
+    }
     
     for (const event of events) {
       // Get the event ID being reacted to (last e tag)
@@ -120,6 +127,8 @@ async function fetchReactions(itemIds: string[]): Promise<Map<string, NostrEvent
       }
     }
     
+    console.log(`Reactions mapped to ${reactionsMap.size} items`);
+    
     return reactionsMap;
   } finally {
     await relay.close();
@@ -127,7 +136,8 @@ async function fetchReactions(itemIds: string[]): Promise<Map<string, NostrEvent
 }
 
 /**
- * Calculate scores for list items based on trusted reactions
+ * Calculate scores for list items based on reactions
+ * TODO: Re-enable trust filtering once NIP-85 data is populated
  */
 function calculateScores(
   items: ListItem[],
@@ -142,7 +152,19 @@ function calculateScores(
     let downvotes = 0;
     let userReaction: '+' | '-' | null = null;
     
+    // Group reactions by author to only count the most recent from each user
+    const reactionsByAuthor = new Map<string, NostrEvent>();
+    
     for (const reaction of itemReactions) {
+      const existing = reactionsByAuthor.get(reaction.pubkey);
+      // Keep the most recent reaction (higher created_at)
+      if (!existing || reaction.created_at > existing.created_at) {
+        reactionsByAuthor.set(reaction.pubkey, reaction);
+      }
+    }
+    
+    // Now count the latest reaction from each user
+    for (const reaction of reactionsByAuthor.values()) {
       const authorRank = trustMap.get(reaction.pubkey) || 0;
       const isTrusted = authorRank > TRUST_THRESHOLD;
       const isCurrentUser = reaction.pubkey === userPubkey;
@@ -153,9 +175,9 @@ function calculateScores(
                        reaction.content === '-' ? '-' : null;
       }
       
-      // Count reactions from trusted users OR the current user
-      // (so users can always see their own votes)
-      if (!isTrusted && !isCurrentUser) continue;
+      // TEMPORARY: Show ALL reactions (trust filtering disabled for early testing)
+      // When NIP-85 trust data is populated, uncomment the line below:
+      // if (!isTrusted && !isCurrentUser) continue;
       
       if (reaction.content === '+' || reaction.content === '') {
         upvotes++;
