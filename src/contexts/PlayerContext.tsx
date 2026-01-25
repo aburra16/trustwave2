@@ -135,21 +135,34 @@ const PlayerContext = createContext<PlayerContextValue | null>(null);
 export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(playerReducer, initialState);
   const audioRef = useRef<HTMLAudioElement>(null);
+  const isPlayingRef = useRef(state.isPlaying);
+  
+  // Keep ref in sync with state
+  useEffect(() => {
+    isPlayingRef.current = state.isPlaying;
+  }, [state.isPlaying]);
   
   // Sync audio element with state
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
     
+    // Don't try to play if we're still loading
+    if (state.isLoading) return;
+    
     if (state.isPlaying) {
-      audio.play().catch(error => {
-        console.error('Playback failed:', error);
-        dispatch({ type: 'SET_ERROR', error: 'Failed to play audio' });
-      });
+      const playPromise = audio.play();
+      if (playPromise !== undefined) {
+        playPromise.catch(error => {
+          console.error('Playback failed:', error);
+          dispatch({ type: 'SET_ERROR', error: 'Failed to play audio' });
+          dispatch({ type: 'PAUSE' }); // Stop trying to play
+        });
+      }
     } else {
       audio.pause();
     }
-  }, [state.isPlaying, state.currentTrack]);
+  }, [state.isPlaying, state.isLoading]);
   
   // Update audio source when track changes
   useEffect(() => {
@@ -159,14 +172,21 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     if (!state.currentTrack?.songUrl) {
       console.error('No songUrl available for current track:', state.currentTrack);
       dispatch({ type: 'SET_ERROR', error: 'No audio URL available' });
+      dispatch({ type: 'PAUSE' }); // Don't try to play
       return;
     }
     
     console.log('Loading audio from URL:', state.currentTrack.songUrl);
+    
+    // Reset playback state
     dispatch({ type: 'SET_LOADING', loading: true });
+    dispatch({ type: 'SET_ERROR', error: null });
+    
+    // Set source and load
+    audio.pause(); // Pause any current playback
     audio.src = state.currentTrack.songUrl;
     audio.load();
-  }, [state.currentTrack?.songUrl]);
+  }, [state.currentTrack?.id]);
   
   // Set volume
   useEffect(() => {
@@ -194,6 +214,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     };
     
     const handleCanPlay = () => {
+      console.log('Audio can play - ready state:', audio.readyState);
       dispatch({ type: 'SET_LOADING', loading: false });
     };
     

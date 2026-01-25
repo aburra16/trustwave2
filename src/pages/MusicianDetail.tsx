@@ -19,11 +19,22 @@ export default function MusicianDetail() {
   
   // Find the musician from the list
   const { data: musicians, isLoading: loadingMusicians } = useMusiciansList();
-  const musician = musicians?.find(m => m.feedId === feedId || m.musicianFeedGuid === feedId);
+  const musician = musicians?.find(m => 
+    m.feedId === feedId || 
+    m.musicianFeedGuid === feedId ||
+    String(m.feedId) === feedId
+  );
+  
+  console.log('MusicianDetail:', { feedId, musician, musicians });
+  
+  // Use the feedId from the musician if we found them, otherwise use the URL param
+  const actualFeedId = musician?.feedId || feedId;
   
   // Fetch feed data and episodes from Podcast Index
-  const { data: feed } = usePodcastIndexFeed(feedId);
-  const { data: episodes, isLoading: loadingEpisodes } = usePodcastIndexEpisodes(feedId);
+  const { data: feed } = usePodcastIndexFeed(actualFeedId);
+  const { data: episodes, isLoading: loadingEpisodes } = usePodcastIndexEpisodes(actualFeedId);
+  
+  console.log('Fetched episodes:', episodes);
   
   const { mutate: publishReaction, isPending: isReacting } = usePublishReaction();
   

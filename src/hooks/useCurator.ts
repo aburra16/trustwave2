@@ -123,6 +123,8 @@ export function useAddMusician() {
         ['t', feed.podcastGuid || String(feed.id)],
         ['name', feed.author || feed.title],
         ['feedUrl', feed.url],
+        ['feedId', String(feed.id)], // Store the numeric feed ID for fetching episodes
+        ['feedGuid', feed.podcastGuid || ''],
       ];
       
       // Add artwork if available

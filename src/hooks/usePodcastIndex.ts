@@ -43,7 +43,8 @@ export function usePodcastIndexEpisodes(feedId: number | string | undefined, ena
       if (!feedId) return [];
       
       try {
-        const url = `${PODCAST_INDEX_PROXY}/episodes/byfeedid?id=${feedId}&max=50`;
+        // Add medium=music to only get music episodes, not podcast episodes
+        const url = `${PODCAST_INDEX_PROXY}/episodes/byfeedid?id=${feedId}&max=50&medium=music`;
         console.log('Fetching episodes from:', url);
         
         const response = await fetch(url);
