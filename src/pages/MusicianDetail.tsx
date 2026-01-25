@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { SongCard } from '@/components/songs/SongCard';
 import { Skeleton } from '@/components/ui/skeleton';
 import { usePodcastIndexEpisodes, usePodcastIndexFeed } from '@/hooks/usePodcastIndex';
-import { usePodcastIndexFeedByGuid } from '@/hooks/usePodcastIndexByGuid';
+import { usePodcastIndexFeedByGuid, usePodcastIndexFeedByName } from '@/hooks/usePodcastIndexByGuid';
 import { useMusiciansList } from '@/hooks/useDecentralizedList';
 import { usePublishReaction } from '@/hooks/useReaction';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
@@ -35,24 +35,36 @@ export default function MusicianDetail() {
   });
   
   // Determine which ID to use for fetching
-  // If musician has numeric feedId, use that (most reliable)
-  // Otherwise, try to look up by GUID and get the numeric ID
   const isGuid = urlFeedId?.includes('-'); // GUIDs have dashes
   const numericFeedId = musician?.feedId;
+  const artistName = musician?.musicianName || musician?.name;
   
-  // If URL has GUID but we don't have numeric ID, try to look up the feed
+  // Try multiple fallback strategies:
+  // 1. Use stored numeric feedId (best)
+  // 2. Look up by feedGuid
+  // 3. Look up by artist name (last resort)
   const { data: feedByGuid } = usePodcastIndexFeedByGuid(
-    isGuid && !numericFeedId ? urlFeedId : undefined
+    isGuid && !numericFeedId && urlFeedId ? urlFeedId : undefined
   );
   
-  // Use numeric ID from musician, or from the feedByGuid lookup, or try the URL param
-  const actualFeedId = numericFeedId || feedByGuid?.id || (!isGuid ? urlFeedId : undefined);
+  const { data: feedByName } = usePodcastIndexFeedByName(
+    !numericFeedId && !feedByGuid && artistName ? artistName : undefined
+  );
+  
+  // Use numeric ID from musician, or from lookups, or try the URL param
+  const actualFeedId = numericFeedId || feedByGuid?.id || feedByName?.id || (!isGuid ? urlFeedId : undefined);
   
   // Fetch feed data and episodes from Podcast Index using numeric ID
   const { data: feed } = usePodcastIndexFeed(actualFeedId);
   const { data: episodes, isLoading: loadingEpisodes } = usePodcastIndexEpisodes(actualFeedId);
   
-  console.log('Using numeric feedId:', actualFeedId);
+  console.log('Lookup chain:', {
+    urlFeedId,
+    numericFeedId: musician?.feedId,
+    feedByGuid: feedByGuid?.id,
+    feedByName: feedByName?.id,
+    actualFeedId,
+  });
   console.log('Fetched episodes:', episodes?.length, 'episodes');
   
   const { mutate: publishReaction, isPending: isReacting } = usePublishReaction();

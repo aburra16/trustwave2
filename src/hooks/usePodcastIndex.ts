@@ -76,25 +76,17 @@ export function usePodcastIndexEpisodes(feedId: number | string | undefined, ena
 
 /**
  * Get feed details by ID
+ * NOTE: Disabled for now - worker doesn't support /feed endpoint yet
+ * We get feed info from other sources (search results, feedByGuid lookup)
  */
 export function usePodcastIndexFeed(feedId: number | string | undefined, enabled = true) {
   return useQuery({
     queryKey: ['podcastIndex', 'feed', feedId],
     queryFn: async (): Promise<PodcastIndexFeed | null> => {
-      if (!feedId) return null;
-      
-      const response = await fetch(
-        `${PODCAST_INDEX_PROXY}/feed?id=${feedId}`
-      );
-      
-      if (!response.ok) {
-        throw new Error(`Podcast Index feed fetch failed: ${response.statusText}`);
-      }
-      
-      const data = await response.json();
-      return data.feed || null;
+      // Disabled - worker doesn't have /feed endpoint
+      return null;
     },
-    enabled: enabled && !!feedId,
+    enabled: false, // Disabled
     staleTime: 10 * 60 * 1000, // 10 minutes
   });
 }
