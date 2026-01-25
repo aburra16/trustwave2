@@ -62,12 +62,23 @@ export default {
 					'accent-foreground': 'hsl(var(--sidebar-accent-foreground))',
 					border: 'hsl(var(--sidebar-border))',
 					ring: 'hsl(var(--sidebar-ring))'
+				},
+				// TrustWave custom colors
+				tw: {
+					purple: 'hsl(var(--tw-purple))',
+					cyan: 'hsl(var(--tw-cyan))',
+					pink: 'hsl(var(--tw-pink))',
+					orange: 'hsl(var(--tw-orange))',
+					success: 'hsl(var(--tw-success))',
 				}
 			},
 			borderRadius: {
 				lg: 'var(--radius)',
 				md: 'calc(var(--radius) - 2px)',
 				sm: 'calc(var(--radius) - 4px)'
+			},
+			fontFamily: {
+				sans: ['Inter Variable', 'Inter', 'system-ui', 'sans-serif'],
 			},
 			keyframes: {
 				'accordion-down': {
@@ -85,11 +96,48 @@ export default {
 					to: {
 						height: '0'
 					}
+				},
+				'pulse-glow': {
+					'0%, 100%': {
+						opacity: '1',
+						boxShadow: '0 0 20px hsl(var(--tw-purple) / 0.4)'
+					},
+					'50%': {
+						opacity: '0.8',
+						boxShadow: '0 0 40px hsl(var(--tw-purple) / 0.6)'
+					}
+				},
+				'slide-in-right': {
+					from: {
+						transform: 'translateX(100%)',
+						opacity: '0'
+					},
+					to: {
+						transform: 'translateX(0)',
+						opacity: '1'
+					}
+				},
+				'slide-in-up': {
+					from: {
+						transform: 'translateY(20px)',
+						opacity: '0'
+					},
+					to: {
+						transform: 'translateY(0)',
+						opacity: '1'
+					}
 				}
 			},
 			animation: {
 				'accordion-down': 'accordion-down 0.2s ease-out',
-				'accordion-up': 'accordion-up 0.2s ease-out'
+				'accordion-up': 'accordion-up 0.2s ease-out',
+				'pulse-glow': 'pulse-glow 2s ease-in-out infinite',
+				'slide-in-right': 'slide-in-right 0.3s ease-out',
+				'slide-in-up': 'slide-in-up 0.3s ease-out'
+			},
+			backgroundImage: {
+				'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
+				'gradient-conic': 'conic-gradient(from 180deg at 50% 50%, var(--tw-gradient-stops))',
 			}
 		}
 	},

@@ -12,6 +12,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { NostrLoginProvider } from '@nostrify/react/login';
 import { AppProvider } from '@/components/AppProvider';
 import { NWCProvider } from '@/contexts/NWCContext';
+import { PlayerProvider } from '@/contexts/PlayerContext';
 import { AppConfig } from '@/contexts/AppContext';
 import AppRouter from './AppRouter';
 
@@ -32,12 +33,12 @@ const queryClient = new QueryClient({
 });
 
 const defaultConfig: AppConfig = {
-  theme: "light",
+  theme: "dark",
   relayMetadata: {
     relays: [
-      { url: 'wss://relay.ditto.pub', read: true, write: true },
-      { url: 'wss://relay.nostr.band', read: true, write: true },
       { url: 'wss://relay.damus.io', read: true, write: true },
+      { url: 'wss://relay.primal.net', read: true, write: true },
+      { url: 'wss://dcosl.brainstorm.world', read: true, write: true },
     ],
     updatedAt: 0,
   },
@@ -52,12 +53,14 @@ export function App() {
             <NostrProvider>
               <NostrSync />
               <NWCProvider>
-                <TooltipProvider>
-                  <Toaster />
-                  <Suspense>
-                    <AppRouter />
-                  </Suspense>
-                </TooltipProvider>
+                <PlayerProvider>
+                  <TooltipProvider>
+                    <Toaster />
+                    <Suspense>
+                      <AppRouter />
+                    </Suspense>
+                  </TooltipProvider>
+                </PlayerProvider>
               </NWCProvider>
             </NostrProvider>
           </NostrLoginProvider>
