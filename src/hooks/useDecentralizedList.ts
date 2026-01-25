@@ -3,6 +3,7 @@ import { useNostr } from '@nostrify/react';
 import { NRelay1, type NostrEvent } from '@nostrify/nostrify';
 import { useTrustMap } from './useTrustedAssertions';
 import { useCurrentUser } from './useCurrentUser';
+import { useHiddenItems } from './useHiddenItems';
 import { 
   DCOSL_RELAY, 
   KINDS, 
@@ -179,9 +180,10 @@ function calculateScores(
 export function useSongsList() {
   const { data: trustMap } = useTrustMap();
   const { user } = useCurrentUser();
+  const { hiddenIds } = useHiddenItems();
   
   return useQuery({
-    queryKey: ['nostr', 'songsList'],
+    queryKey: ['nostr', 'songsList', hiddenIds.length],
     queryFn: async (): Promise<ScoredListItem[]> => {
       console.log('useSongsList: Fetching songs...');
       
@@ -193,14 +195,18 @@ export function useSongsList() {
         return [];
       }
       
+      // Filter out hidden items
+      const visibleItems = items.filter(item => !hiddenIds.includes(item.id));
+      console.log(`useSongsList: ${visibleItems.length} visible after filtering ${hiddenIds.length} hidden`);
+      
       // Fetch reactions for all items
-      const itemIds = items.map(item => item.id);
+      const itemIds = visibleItems.map(item => item.id);
       const reactions = await fetchReactions(itemIds);
       console.log(`useSongsList: Found reactions for ${reactions.size} items`);
       
       // Calculate scores (use empty trust map if not loaded - will show all items)
       const scoredItems = calculateScores(
-        items, 
+        visibleItems, 
         reactions, 
         trustMap || new Map(), 
         user?.pubkey
@@ -224,9 +230,10 @@ export function useSongsList() {
 export function useMusiciansList() {
   const { data: trustMap } = useTrustMap();
   const { user } = useCurrentUser();
+  const { hiddenIds } = useHiddenItems();
   
   return useQuery({
-    queryKey: ['nostr', 'musiciansList'],
+    queryKey: ['nostr', 'musiciansList', hiddenIds.length],
     queryFn: async (): Promise<ScoredListItem[]> => {
       console.log('useMusiciansList: Fetching musicians...');
       
@@ -238,14 +245,18 @@ export function useMusiciansList() {
         return [];
       }
       
+      // Filter out hidden items
+      const visibleItems = items.filter(item => !hiddenIds.includes(item.id));
+      console.log(`useMusiciansList: ${visibleItems.length} visible after filtering ${hiddenIds.length} hidden`);
+      
       // Fetch reactions for all items
-      const itemIds = items.map(item => item.id);
+      const itemIds = visibleItems.map(item => item.id);
       const reactions = await fetchReactions(itemIds);
       console.log(`useMusiciansList: Found reactions for ${reactions.size} items`);
       
       // Calculate scores
       const scoredItems = calculateScores(
-        items, 
+        visibleItems, 
         reactions, 
         trustMap || new Map(), 
         user?.pubkey

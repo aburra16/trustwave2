@@ -6,7 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useSongsList, useMusiciansList } from '@/hooks/useDecentralizedList';
-import { useDeleteListItem } from '@/hooks/useDeleteListItem';
+import { useHiddenItems } from '@/hooks/useHiddenItems';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { LoginArea } from '@/components/auth/LoginArea';
 import { APP_NAME } from '@/lib/constants';
@@ -20,15 +20,15 @@ export default function Manage() {
   const { user } = useCurrentUser();
   const { data: songs } = useSongsList();
   const { data: musicians } = useMusiciansList();
-  const { mutate: deleteItem, isPending: deleting } = useDeleteListItem();
+  const { hideItem, unhideItem, isHidden } = useHiddenItems();
   
   // Filter to only show items added by the current user
   const mySongs = songs?.filter(s => s.pubkey === user?.pubkey) || [];
   const myMusicians = musicians?.filter(m => m.pubkey === user?.pubkey) || [];
   
-  const handleDelete = (eventId: string) => {
-    if (confirm('Are you sure you want to remove this item?')) {
-      deleteItem(eventId);
+  const handleHide = (eventId: string, itemName: string) => {
+    if (confirm(`Hide "${itemName}"? You can re-add it later from Search.`)) {
+      hideItem(eventId);
     }
   };
   
@@ -63,8 +63,8 @@ export default function Manage() {
         <Alert className="mb-6">
           <AlertCircle className="w-4 h-4" />
           <AlertDescription>
-            <strong>Note:</strong> Delete old entries if they're missing data (like feedId). 
-            After deleting, re-add them from the Search page to get the latest data structure.
+            <strong>Note:</strong> Hide old entries missing feedId, then re-add them from Search. 
+            Hidden items won't show in your lists. This is stored locally in your browser.
           </AlertDescription>
         </Alert>
         
@@ -110,16 +110,19 @@ export default function Manage() {
                     </div>
                   </div>
                   
-                  {/* Delete */}
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => handleDelete(song.id)}
-                    disabled={deleting}
-                    className="text-destructive hover:text-destructive"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
+                  {/* Hide */}
+                  {isHidden(song.id) ? (
+                    <span className="text-xs text-muted-foreground px-2">Hidden</span>
+                  ) : (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleHide(song.id, song.songTitle || 'this song')}
+                      className="text-destructive hover:text-destructive"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  )}
                 </div>
               ))
             )}
@@ -158,16 +161,19 @@ export default function Manage() {
                     </div>
                   </div>
                   
-                  {/* Delete */}
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => handleDelete(musician.id)}
-                    disabled={deleting}
-                    className="text-destructive hover:text-destructive"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
+                  {/* Hide */}
+                  {isHidden(musician.id) ? (
+                    <span className="text-xs text-muted-foreground px-2">Hidden</span>
+                  ) : (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleHide(musician.id, musician.musicianName || musician.name || 'this musician')}
+                      className="text-destructive hover:text-destructive"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  )}
                 </div>
               ))
             )}

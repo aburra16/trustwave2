@@ -40,6 +40,10 @@ export function useDeleteListItem() {
         console.log('Delete event published successfully!');
       } catch (error) {
         console.error('Failed to publish delete event:', error);
+        console.error('Error details:', JSON.stringify(error, null, 2));
+        if (error instanceof Error) {
+          throw new Error(`Delete failed: ${error.message}`);
+        }
         throw error;
       } finally {
         await relay.close();
