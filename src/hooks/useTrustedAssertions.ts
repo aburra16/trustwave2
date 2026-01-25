@@ -160,7 +160,8 @@ async function fetchTrustAssertions(
   let oldestTimestamp: number | undefined = undefined;
   let hasMore = true;
   
-  console.log(`Fetching trust assertions from ${relayUrl} by ${providerPubkey.slice(0, 8)}...`);
+  console.log(`Fetching trust assertions from ${relayUrl}`);
+  console.log(`Looking for kind ${KINDS.TRUSTED_ASSERTION_PUBKEY} by author ${providerPubkey}`);
   
   try {
     const relay = new NRelay1(relayUrl);
@@ -178,9 +179,11 @@ async function fetchTrustAssertions(
         filter.until = oldestTimestamp;
       }
       
-      console.log(`Fetching batch with until=${oldestTimestamp || 'none'}...`);
+      console.log(`Query filter:`, JSON.stringify(filter));
       
       const events = await relay.query([filter]);
+      
+      console.log(`Received ${events.length} events from relay`);
       
       if (events.length === 0) {
         hasMore = false;

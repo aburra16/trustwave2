@@ -8,7 +8,8 @@ export const NIP85_RELAY = 'wss://nip85.brainstorm.world';
 export const NIP85_FALLBACK_RELAY = 'wss://testnip85.nosfabrica.com';
 
 // Genesis curator pubkey (fallback for trust calculations)
-export const GENESIS_CURATOR_PUBKEY = 'b83a28b7e4e5d20bd960c5faeb6625f95529166b8bdb045d42634a2f35919450';
+// Using test pubkey with pre-populated NIP-85 data
+export const GENESIS_CURATOR_PUBKEY = '0d3cd16f0d41740e36f354ae23f7e7f87e076298a8f086ff95d7141d7082c948';
 
 // Master list "a" tags (kind:pubkey:d-tag format)
 export const SONGS_LIST_A_TAG = '39998:b83a28b7e4e5d20bd960c5faeb6625f95529166b8bdb045d42634a2f35919450:17c49d8b-c0d9-49bf-875f-6c7568f45f38';
