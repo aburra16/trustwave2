@@ -37,11 +37,12 @@ export function usePublishReaction() {
       console.log('Publishing reaction:', { reaction, targetEventId, targetPubkey, targetKind, currentReaction });
       
       // Create the reaction event
+      // Note: Some relays enforce strict tag sizes, so we use minimal format
       const event = await user.signer.signEvent({
         kind: KINDS.REACTION,
         content: reaction,
         tags: [
-          ['e', targetEventId, DCOSL_RELAY],
+          ['e', targetEventId],
           ['p', targetPubkey],
           ['k', String(targetKind)],
         ],
