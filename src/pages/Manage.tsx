@@ -1,5 +1,5 @@
 import { useSeoMeta } from '@unhead/react';
-import { Trash2, Music, Users, AlertCircle } from 'lucide-react';
+import { Trash2, Music, Users, AlertCircle, CheckCircle2, EyeOff } from 'lucide-react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useSongsList, useMusiciansList } from '@/hooks/useDecentralizedList';
 import { useHiddenItems } from '@/hooks/useHiddenItems';
+import { useDeleteListItem } from '@/hooks/useDeleteListItem';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { LoginArea } from '@/components/auth/LoginArea';
 import { APP_NAME } from '@/lib/constants';
@@ -20,15 +21,16 @@ export default function Manage() {
   const { user } = useCurrentUser();
   const { data: songs } = useSongsList();
   const { data: musicians } = useMusiciansList();
-  const { hideItem, unhideItem, isHidden } = useHiddenItems();
+  const { isHidden } = useHiddenItems();
+  const { mutate: deleteItem, isPending: deleting } = useDeleteListItem();
   
   // Filter to only show items added by the current user
   const mySongs = songs?.filter(s => s.pubkey === user?.pubkey) || [];
   const myMusicians = musicians?.filter(m => m.pubkey === user?.pubkey) || [];
   
-  const handleHide = (eventId: string, itemName: string) => {
-    if (confirm(`Hide "${itemName}"? You can re-add it later from Search.`)) {
-      hideItem(eventId);
+  const handleDelete = (eventId: string, itemName: string) => {
+    if (confirm(`Remove "${itemName}"? This will delete it from the relay or hide it locally.`)) {
+      deleteItem(eventId);
     }
   };
   
@@ -63,8 +65,8 @@ export default function Manage() {
         <Alert className="mb-6">
           <AlertCircle className="w-4 h-4" />
           <AlertDescription>
-            <strong>Note:</strong> Hide old entries missing feedId, then re-add them from Search. 
-            Hidden items won't show in your lists. This is stored locally in your browser.
+            <strong>Tip:</strong> Delete old entries missing feedId, then re-add them from Search. 
+            The app will try to delete from the relay first, or hide locally if the relay doesn't support deletion.
           </AlertDescription>
         </Alert>
         
@@ -110,19 +112,23 @@ export default function Manage() {
                     </div>
                   </div>
                   
-                  {/* Hide */}
-                  {isHidden(song.id) ? (
-                    <span className="text-xs text-muted-foreground px-2">Hidden</span>
-                  ) : (
+                  {/* Delete/Hide Status */}
+                  <div className="flex items-center gap-2">
+                    {isHidden(song.id) && (
+                      <span className="text-xs px-2 py-1 rounded-full bg-muted text-muted-foreground">
+                        Hidden
+                      </span>
+                    )}
                     <Button
                       variant="ghost"
                       size="icon"
-                      onClick={() => handleHide(song.id, song.songTitle || 'this song')}
+                      onClick={() => handleDelete(song.id, song.songTitle || 'this song')}
+                      disabled={deleting}
                       className="text-destructive hover:text-destructive"
                     >
                       <Trash2 className="w-4 h-4" />
                     </Button>
-                  )}
+                  </div>
                 </div>
               ))
             )}
@@ -161,19 +167,23 @@ export default function Manage() {
                     </div>
                   </div>
                   
-                  {/* Hide */}
-                  {isHidden(musician.id) ? (
-                    <span className="text-xs text-muted-foreground px-2">Hidden</span>
-                  ) : (
+                  {/* Delete/Hide Status */}
+                  <div className="flex items-center gap-2">
+                    {isHidden(musician.id) && (
+                      <span className="text-xs px-2 py-1 rounded-full bg-muted text-muted-foreground">
+                        Hidden
+                      </span>
+                    )}
                     <Button
                       variant="ghost"
                       size="icon"
-                      onClick={() => handleHide(musician.id, musician.musicianName || musician.name || 'this musician')}
+                      onClick={() => handleDelete(musician.id, musician.musicianName || musician.name || 'this musician')}
+                      disabled={deleting}
                       className="text-destructive hover:text-destructive"
                     >
                       <Trash2 className="w-4 h-4" />
                     </Button>
-                  )}
+                  </div>
                 </div>
               ))
             )}

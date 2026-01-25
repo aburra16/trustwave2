@@ -2,60 +2,83 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { NRelay1, type NostrEvent } from '@nostrify/nostrify';
 import { useCurrentUser } from './useCurrentUser';
 import { useToast } from './useToast';
-import { DCOSL_RELAY, KINDS } from '@/lib/constants';
+import { useHiddenItems } from './useHiddenItems';
+import { DCOSL_RELAY } from '@/lib/constants';
+
+interface DeleteResult {
+  success: boolean;
+  method: 'deleted' | 'hidden';
+  event?: NostrEvent;
+}
 
 /**
  * Hook to delete a list item (song or musician) by publishing a kind 5 delete event
+ * Falls back to client-side hiding if relay deletion fails
  */
 export function useDeleteListItem() {
   const { user } = useCurrentUser();
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { hideItem } = useHiddenItems();
   
   return useMutation({
-    mutationFn: async (eventId: string): Promise<NostrEvent> => {
+    mutationFn: async (eventId: string): Promise<DeleteResult> => {
       if (!user) {
         throw new Error('You must be logged in to delete items');
       }
       
-      console.log('Deleting event:', eventId);
+      console.log('Attempting to delete event:', eventId);
       
-      // Create a kind 5 delete event
-      const deleteEvent = await user.signer.signEvent({
-        kind: 5,
-        content: 'Deleting outdated entry',
-        tags: [
-          ['e', eventId],
-        ],
-        created_at: Math.floor(Date.now() / 1000),
-      });
-      
-      console.log('Publishing delete event:', deleteEvent);
-      
-      // Publish to the DCOSL relay
-      const relay = new NRelay1(DCOSL_RELAY);
-      
+      // Try to publish kind 5 delete event first
       try {
-        await relay.event(deleteEvent);
-        console.log('Delete event published successfully!');
-      } catch (error) {
-        console.error('Failed to publish delete event:', error);
-        console.error('Error details:', JSON.stringify(error, null, 2));
-        if (error instanceof Error) {
-          throw new Error(`Delete failed: ${error.message}`);
+        const deleteEvent = await user.signer.signEvent({
+          kind: 5,
+          content: 'Removing outdated entry',
+          tags: [
+            ['e', eventId],
+          ],
+          created_at: Math.floor(Date.now() / 1000),
+        });
+        
+        console.log('Publishing delete event:', deleteEvent);
+        
+        const relay = new NRelay1(DCOSL_RELAY);
+        
+        try {
+          await relay.event(deleteEvent);
+          console.log('✅ Delete event published successfully to relay!');
+          return {
+            success: true,
+            method: 'deleted',
+            event: deleteEvent,
+          };
+        } finally {
+          await relay.close();
         }
-        throw error;
-      } finally {
-        await relay.close();
+      } catch (error) {
+        console.warn('❌ Relay deletion failed, falling back to client-side hide:', error);
+        
+        // Fallback: hide client-side
+        hideItem(eventId);
+        
+        return {
+          success: true,
+          method: 'hidden',
+        };
       }
-      
-      return deleteEvent;
     },
-    onSuccess: () => {
-      toast({
-        title: 'Deleted',
-        description: 'Item removed from the list',
-      });
+    onSuccess: (result) => {
+      if (result.method === 'deleted') {
+        toast({
+          title: 'Deleted from Relay',
+          description: 'Item permanently removed from the network',
+        });
+      } else {
+        toast({
+          title: 'Hidden Locally',
+          description: 'Item hidden in your browser (relay deletion not supported)',
+        });
+      }
       
       // Refresh all lists
       queryClient.invalidateQueries({ queryKey: ['nostr', 'songsList'] });
@@ -64,9 +87,9 @@ export function useDeleteListItem() {
       queryClient.refetchQueries({ queryKey: ['nostr', 'musiciansList'] });
     },
     onError: (error) => {
-      console.error('Failed to delete item:', error);
+      console.error('Failed to delete/hide item:', error);
       toast({
-        title: 'Failed to Delete',
+        title: 'Failed to Remove',
         description: error.message,
         variant: 'destructive',
       });
