@@ -5,18 +5,32 @@ import type { ScoredListItem } from './types';
  * This aggregates multiple feeds/albums from the same artist into one entry
  */
 export function groupMusiciansByArtist(musicians: ScoredListItem[]): ScoredListItem[] {
+  console.log('Grouping musicians:', musicians.length, 'entries');
   const artistMap = new Map<string, ScoredListItem[]>();
   
   // Group by artist name (case-insensitive)
   for (const musician of musicians) {
     const artistName = (musician.musicianName || musician.name || 'Unknown Artist').toLowerCase();
+    console.log('Processing musician:', artistName, {
+      feedId: musician.feedId,
+      feedGuid: musician.feedGuid,
+      musicianFeedGuid: musician.musicianFeedGuid,
+    });
     const existing = artistMap.get(artistName) || [];
     existing.push(musician);
     artistMap.set(artistName, existing);
   }
   
+  console.log('Artist map:', Array.from(artistMap.entries()).map(([name, entries]) => ({
+    name,
+    count: entries.length,
+    feedIds: entries.map(e => e.feedId),
+  })));
+  
   // Create aggregated entries
   const aggregated: ScoredListItem[] = [];
+  
+  console.log('Creating aggregated entries from', artistMap.size, 'artists');
   
   for (const [artistName, entries] of artistMap.entries()) {
     // Use the entry with the highest score as the primary
@@ -45,6 +59,7 @@ export function groupMusiciansByArtist(musicians: ScoredListItem[]): ScoredListI
     });
   }
   
+  console.log('Returning', aggregated.length, 'aggregated musicians');
   return aggregated.sort((a, b) => b.score - a.score);
 }
 

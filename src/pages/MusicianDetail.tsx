@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { SongCard } from '@/components/songs/SongCard';
 import { Skeleton } from '@/components/ui/skeleton';
 import { usePodcastIndexEpisodes } from '@/hooks/usePodcastIndex';
+import { usePodcastIndexFeedByGuid } from '@/hooks/usePodcastIndexByGuid';
 import { useMusiciansList } from '@/hooks/useDecentralizedList';
 import { usePublishReaction } from '@/hooks/useReaction';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
@@ -41,18 +42,43 @@ export default function MusicianDetail() {
   });
   
   // Fetch episodes from ALL feeds for this artist
-  const episodeQueries = artistEntries
-    .filter(e => e.feedId)
-    .map(entry => ({
-      feedId: entry.feedId!,
-      query: usePodcastIndexEpisodes(entry.feedId),
+  // For entries without feedId, we need to look up by feedGuid first
+  const entriesWithFeedId = artistEntries.filter(e => e.feedId);
+  const entriesWithoutFeedId = artistEntries.filter(e => !e.feedId && (e.feedGuid || e.musicianFeedGuid));
+  
+  console.log('Entries with feedId:', entriesWithFeedId.length);
+  console.log('Entries needing GUID lookup:', entriesWithoutFeedId.length);
+  
+  // Fetch episodes for entries that have feedId
+  const episodeQueries = entriesWithFeedId.map(entry => ({
+    feedId: entry.feedId!,
+    query: usePodcastIndexEpisodes(entry.feedId),
+  }));
+  
+  // For entries without feedId, look up by GUID to get feedId, then fetch episodes
+  const guidLookups = entriesWithoutFeedId.map(entry => {
+    const guid = entry.feedGuid || entry.musicianFeedGuid;
+    return {
+      guid,
+      lookup: usePodcastIndexFeedByGuid(guid),
+    };
+  });
+  
+  // Now fetch episodes for the looked-up feeds
+  const additionalEpisodeQueries = guidLookups
+    .filter(lookup => lookup.lookup.data?.id)
+    .map(lookup => ({
+      feedId: lookup.lookup.data!.id,
+      query: usePodcastIndexEpisodes(lookup.lookup.data!.id),
     }));
   
-  // Combine all episodes from all feeds
-  const allEpisodes = episodeQueries.flatMap(q => q.query.data || []);
-  const isLoadingEpisodes = episodeQueries.some(q => q.query.isLoading);
+  const allEpisodeQueries = [...episodeQueries, ...additionalEpisodeQueries];
   
-  console.log('Fetching from feeds:', artistEntries.map(e => e.feedId));
+  // Combine all episodes from all feeds
+  const allEpisodes = allEpisodeQueries.flatMap(q => q.query.data || []);
+  const isLoadingEpisodes = allEpisodeQueries.some(q => q.query.isLoading) || guidLookups.some(l => l.lookup.isLoading);
+  
+  console.log('Fetching from feeds:', allEpisodeQueries.map(q => q.feedId));
   console.log('Total episodes across all feeds:', allEpisodes.length);
   
   const { mutate: publishReaction, isPending: isReacting } = usePublishReaction();
