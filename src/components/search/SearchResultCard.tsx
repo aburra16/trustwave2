@@ -37,12 +37,13 @@ export function SearchResultCard({ feed }: SearchResultCardProps) {
       return;
     }
     
-    addMusician({ feed }, {
-      onSuccess: () => {
+    addMusician({ feed, addSongsAutomatically: true }, {
+      onSuccess: (data) => {
         setAddedMusician(true);
+        const songCount = data.songEvents.length;
         toast({
           title: 'Musician Added',
-          description: `${feed.author || feed.title} has been added to the musicians list.`,
+          description: `${feed.author || feed.title} and ${songCount} songs have been added!`,
         });
       },
       onError: (error) => {

@@ -1,8 +1,8 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { NRelay1, type NostrEvent } from '@nostrify/nostrify';
 import { useCurrentUser } from './useCurrentUser';
-import { DCOSL_RELAY, KINDS, SONGS_LIST_A_TAG, MUSICIANS_LIST_A_TAG } from '@/lib/constants';
-import type { PodcastIndexEpisode, PodcastIndexFeed } from '@/lib/types';
+import { DCOSL_RELAY, KINDS, SONGS_LIST_A_TAG, MUSICIANS_LIST_A_TAG, PODCAST_INDEX_PROXY } from '@/lib/constants';
+import type { PodcastIndexEpisode, PodcastIndexFeed, PodcastIndexEpisodesResponse } from '@/lib/types';
 
 interface AddSongParams {
   episode: PodcastIndexEpisode;
@@ -14,6 +14,7 @@ interface AddSongParams {
 interface AddMusicianParams {
   feed: PodcastIndexFeed;
   annotation?: string;
+  addSongsAutomatically?: boolean; // If true, also add all songs from this artist
 }
 
 interface CreateListParams {
@@ -104,18 +105,19 @@ export function useAddSong() {
 
 /**
  * Hook to add a musician to the master musicians list
+ * Optionally also adds all their songs
  */
 export function useAddMusician() {
   const { user } = useCurrentUser();
   const queryClient = useQueryClient();
   
   return useMutation({
-    mutationFn: async (params: AddMusicianParams): Promise<NostrEvent> => {
+    mutationFn: async (params: AddMusicianParams): Promise<{ musicianEvent: NostrEvent; songEvents: NostrEvent[] }> => {
       if (!user) {
         throw new Error('You must be logged in to add musicians');
       }
       
-      const { feed, annotation } = params;
+      const { feed, annotation, addSongsAutomatically = true } = params;
       
       // Build tags
       const tags: string[][] = [
@@ -140,8 +142,8 @@ export function useAddMusician() {
       // Add alt tag for NIP-31
       tags.push(['alt', `Musician: ${feed.author || feed.title}`]);
       
-      // Create the list item event
-      const event = await user.signer.signEvent({
+      // Create the musician list item event
+      const musicianEvent = await user.signer.signEvent({
         kind: KINDS.LIST_ITEM,
         content: '',
         tags,
@@ -150,17 +152,75 @@ export function useAddMusician() {
       
       // Publish to the DCOSL relay
       const relay = new NRelay1(DCOSL_RELAY);
+      const songEvents: NostrEvent[] = [];
       
       try {
-        await relay.event(event);
+        await relay.event(musicianEvent);
+        console.log('Musician event published successfully!');
+        
+        // Auto-add all songs from this artist
+        if (addSongsAutomatically) {
+          console.log('Auto-adding songs for artist:', feed.author || feed.title);
+          
+          try {
+            // Fetch episodes
+            const episodesResponse = await fetch(
+              `${PODCAST_INDEX_PROXY}/episodes/byfeedid?id=${feed.id}&max=100`
+            );
+            
+            if (episodesResponse.ok) {
+              const episodesData: PodcastIndexEpisodesResponse = await episodesResponse.json();
+              const episodes = episodesData.items || [];
+              
+              console.log(`Auto-adding ${episodes.length} songs...`);
+              
+              // Add each episode as a song
+              for (const episode of episodes) {
+                const songTags: string[][] = [
+                  ['z', SONGS_LIST_A_TAG],
+                  ['t', episode.guid],
+                  ['title', episode.title],
+                  ['artist', feed.author || feed.title],
+                  ['url', episode.enclosureUrl],
+                  ['duration', String(episode.duration || 0)],
+                  ['feedId', String(feed.id)],
+                  ['feedGuid', feed.podcastGuid || ''],
+                ];
+                
+                if (episode.image || episode.feedImage || feed.artwork) {
+                  songTags.push(['artwork', episode.image || episode.feedImage || feed.artwork]);
+                }
+                
+                songTags.push(['alt', `Song: ${episode.title} by ${feed.author || feed.title}`]);
+                
+                const songEvent = await user.signer.signEvent({
+                  kind: KINDS.LIST_ITEM,
+                  content: '',
+                  tags: songTags,
+                  created_at: Math.floor(Date.now() / 1000),
+                });
+                
+                await relay.event(songEvent);
+                songEvents.push(songEvent);
+              }
+              
+              console.log(`✅ Auto-added ${songEvents.length} songs successfully!`);
+            }
+          } catch (error) {
+            console.warn('Failed to auto-add songs (musician still added):', error);
+          }
+        }
       } finally {
         await relay.close();
       }
       
-      return event;
+      return { musicianEvent, songEvents };
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['nostr', 'musiciansList'] });
+      queryClient.invalidateQueries({ queryKey: ['nostr', 'songsList'] });
+      
+      console.log(`Added musician + ${data.songEvents.length} songs`);
     },
     onError: (error) => {
       console.error('Failed to add musician:', error);
