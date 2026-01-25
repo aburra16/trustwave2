@@ -136,8 +136,8 @@ async function fetchReactions(itemIds: string[]): Promise<Map<string, NostrEvent
 }
 
 /**
- * Calculate scores for list items based on reactions
- * TODO: Re-enable trust filtering once NIP-85 data is populated
+ * Calculate scores for list items based on trusted reactions
+ * Uses Web-of-Trust filtering (rank > 50)
  */
 function calculateScores(
   items: ListItem[],
@@ -145,6 +145,8 @@ function calculateScores(
   trustMap: Map<string, number>,
   userPubkey?: string
 ): ScoredListItem[] {
+  console.log(`Calculating scores with trust map containing ${trustMap.size} pubkeys`);
+  
   return items.map(item => {
     const itemReactions = reactions.get(item.id) || [];
     
@@ -163,8 +165,13 @@ function calculateScores(
       }
     }
     
+    let totalReactions = 0;
+    let trustedReactions = 0;
+    let filteredReactions = 0;
+    
     // Now count the latest reaction from each user
     for (const reaction of reactionsByAuthor.values()) {
+      totalReactions++;
       const authorRank = trustMap.get(reaction.pubkey) || 0;
       const isTrusted = authorRank > TRUST_THRESHOLD;
       const isCurrentUser = reaction.pubkey === userPubkey;
@@ -175,15 +182,24 @@ function calculateScores(
                        reaction.content === '-' ? '-' : null;
       }
       
-      // TEMPORARY: Show ALL reactions (trust filtering disabled for early testing)
-      // When NIP-85 trust data is populated, uncomment the line below:
-      // if (!isTrusted && !isCurrentUser) continue;
+      // Only count reactions from trusted users (rank > 50) OR the current user
+      if (!isTrusted && !isCurrentUser) {
+        filteredReactions++;
+        continue;
+      }
+      
+      if (isTrusted) trustedReactions++;
       
       if (reaction.content === '+' || reaction.content === '') {
         upvotes++;
       } else if (reaction.content === '-') {
         downvotes++;
       }
+    }
+    
+    // Log filtering stats for first item only (to avoid spam)
+    if (item === items[0] && totalReactions > 0) {
+      console.log(`Trust filtering stats: ${totalReactions} total reactions, ${trustedReactions} trusted, ${filteredReactions} filtered out`);
     }
     
     return {

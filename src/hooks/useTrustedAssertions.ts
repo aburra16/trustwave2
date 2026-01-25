@@ -4,7 +4,8 @@ import { NRelay1, type NostrEvent } from '@nostrify/nostrify';
 import { useCurrentUser } from './useCurrentUser';
 import { 
   GENESIS_CURATOR_PUBKEY, 
-  NIP85_RELAY, 
+  NIP85_RELAY,
+  NIP85_FALLBACK_RELAY,
   KINDS,
   TRUST_THRESHOLD 
 } from '@/lib/constants';
@@ -107,11 +108,21 @@ export function useTrustMap() {
   return useQuery({
     queryKey: ['nostr', 'trustMap', providers?.map(p => p.pubkey).join(',')],
     queryFn: async (): Promise<Map<string, number>> => {
-      const trustMap = new Map<string, number>();
+      let trustMap = new Map<string, number>();
       
       if (!providers || providers.length === 0) {
+        console.log('No trust providers found, using genesis curator fallback');
         // Fallback: use genesis curator as trust source
-        return fetchTrustAssertions(GENESIS_CURATOR_PUBKEY, NIP85_RELAY);
+        // Try primary relay first
+        trustMap = await fetchTrustAssertions(GENESIS_CURATOR_PUBKEY, NIP85_RELAY);
+        
+        // If no data, try fallback relay
+        if (trustMap.size === 0) {
+          console.log('Primary relay had no data, trying fallback relay...');
+          trustMap = await fetchTrustAssertions(GENESIS_CURATOR_PUBKEY, NIP85_FALLBACK_RELAY);
+        }
+        
+        return trustMap;
       }
       
       // Find the rank provider
@@ -123,36 +134,83 @@ export function useTrustMap() {
       return trustMap;
     },
     enabled: !providersLoading,
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 10 * 60 * 1000, // 10 minutes (longer since we're fetching a lot)
   });
 }
 
 /**
- * Fetch trust assertions from a specific provider
+ * Fetch trust assertions from a specific provider with pagination
+ * Fetches in batches to avoid rate limiting
  */
 async function fetchTrustAssertions(
   providerPubkey: string, 
   relayUrl: string
 ): Promise<Map<string, number>> {
   const trustMap = new Map<string, number>();
+  const BATCH_SIZE = 500; // Fetch 500 at a time to avoid rate limits
+  let totalFetched = 0;
+  let oldestTimestamp: number | undefined = undefined;
+  let hasMore = true;
+  
+  console.log(`Fetching trust assertions from ${relayUrl} by ${providerPubkey.slice(0, 8)}...`);
   
   try {
     const relay = new NRelay1(relayUrl);
     
-    const events = await relay.query([{
-      kinds: [KINDS.TRUSTED_ASSERTION_PUBKEY],
-      authors: [providerPubkey],
-      limit: 1000, // Get a good chunk of trust data
-    }]);
-    
-    for (const event of events) {
-      const assertion = parseTrustedAssertion(event);
-      if (assertion) {
-        trustMap.set(assertion.pubkey, assertion.rank);
+    // Paginate through all events
+    while (hasMore) {
+      const filter: any = {
+        kinds: [KINDS.TRUSTED_ASSERTION_PUBKEY],
+        authors: [providerPubkey],
+        limit: BATCH_SIZE,
+      };
+      
+      // Add until parameter for pagination (fetch older events)
+      if (oldestTimestamp !== undefined) {
+        filter.until = oldestTimestamp;
+      }
+      
+      console.log(`Fetching batch with until=${oldestTimestamp || 'none'}...`);
+      
+      const events = await relay.query([filter]);
+      
+      if (events.length === 0) {
+        hasMore = false;
+        break;
+      }
+      
+      console.log(`Fetched ${events.length} assertions in this batch`);
+      totalFetched += events.length;
+      
+      for (const event of events) {
+        const assertion = parseTrustedAssertion(event);
+        if (assertion) {
+          trustMap.set(assertion.pubkey, assertion.rank);
+        }
+        
+        // Track oldest timestamp for next batch
+        if (!oldestTimestamp || event.created_at < oldestTimestamp) {
+          oldestTimestamp = event.created_at;
+        }
+      }
+      
+      // If we got fewer events than the batch size, we've reached the end
+      if (events.length < BATCH_SIZE) {
+        hasMore = false;
+      }
+      
+      // Safety limit: stop after 200 batches (100k events)
+      if (totalFetched >= 100000) {
+        console.warn('Reached 100k event limit, stopping pagination');
+        hasMore = false;
       }
     }
     
     await relay.close();
+    
+    console.log(`✅ Fetched ${totalFetched} total trust assertions`);
+    console.log(`📊 Trust map contains ${trustMap.size} unique pubkeys`);
+    
   } catch (error) {
     console.error('Failed to fetch trust assertions:', error);
   }

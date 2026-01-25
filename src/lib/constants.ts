@@ -3,8 +3,9 @@
 // The relay where decentralized lists and reactions are stored
 export const DCOSL_RELAY = 'wss://dcosl.brainstorm.world';
 
-// The relay where NIP-85 trusted assertions are stored
+// The relays where NIP-85 trusted assertions are stored
 export const NIP85_RELAY = 'wss://nip85.brainstorm.world';
+export const NIP85_FALLBACK_RELAY = 'wss://testnip85.nosfabrica.com';
 
 // Genesis curator pubkey (fallback for trust calculations)
 export const GENESIS_CURATOR_PUBKEY = 'b83a28b7e4e5d20bd960c5faeb6625f95529166b8bdb045d42634a2f35919450';
@@ -17,7 +18,8 @@ export const MUSICIANS_LIST_A_TAG = '39998:b83a28b7e4e5d20bd960c5faeb6625f955291
 export const PODCAST_INDEX_PROXY = 'https://trustwave-pi-proxy.malfactoryst.workers.dev';
 
 // Trust threshold - users with rank > this are considered trusted
-export const TRUST_THRESHOLD = 10;
+// Using 50 as threshold (normalized 0-100 scale)
+export const TRUST_THRESHOLD = 50;
 
 // Nostr event kinds used
 export const KINDS = {
