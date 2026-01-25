@@ -35,12 +35,22 @@ export function SongCard({ song, index = 0, queue = [], variant = 'default' }: S
   const isCurrentTrack = state.currentTrack?.id === song.id;
   const isPlaying = isCurrentTrack && state.isPlaying;
   
+  // Check if this is a real Nostr event (can be voted on) or just a Podcast Index episode
+  const isNostrEvent = song.event?.id && !song.id.startsWith('episode-');
+  
   const handlePlay = () => {
     playTrack(song, queue.length > 0 ? queue : [song], index);
   };
   
   const handleReaction = (reaction: '+' | '-') => {
-    if (!user) return;
+    if (!user || !isNostrEvent) return;
+    
+    console.log('SongCard reaction params:', {
+      targetEventId: song.id,
+      targetPubkey: song.pubkey,
+      targetKind: song.event.kind || KINDS.LIST_ITEM,
+      songEventKind: song.event?.kind,
+    });
     
     publishReaction({
       targetEventId: song.id,
@@ -230,8 +240,8 @@ export function SongCard({ song, index = 0, queue = [], variant = 'default' }: S
         )}
       </div>
       
-      {/* Action Buttons */}
-      {user && (
+      {/* Action Buttons - only show if this is a real Nostr event */}
+      {user && isNostrEvent && (
         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
           <Button
             variant="ghost"

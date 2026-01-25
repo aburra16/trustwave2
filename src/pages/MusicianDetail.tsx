@@ -105,8 +105,10 @@ export default function MusicianDetail() {
   const description = primaryMusician?.description;
   
   // Convert all episodes to ScoredListItem format for the player
+  // NOTE: These are NOT Nostr events, just Podcast Index episodes
+  // They can be played but not voted on (no event.id)
   const songs: ScoredListItem[] = allEpisodes.map(ep => ({
-    id: ep.guid,
+    id: `episode-${ep.guid}`, // Prefix to distinguish from Nostr event IDs
     pubkey: primaryMusician?.pubkey || '',
     listATag: primaryMusician?.listATag || '',
     songGuid: ep.guid,
@@ -118,7 +120,7 @@ export default function MusicianDetail() {
     feedId: String(ep.feedId),
     feedGuid: ep.podcastGuid,
     createdAt: ep.datePublished,
-    event: primaryMusician?.event || {} as any,
+    event: {} as any, // No event - this is just from Podcast Index
     score: 0,
     upvotes: 0,
     downvotes: 0,

@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { NRelay1, type NostrEvent } from '@nostrify/nostrify';
+import { useNostr } from '@nostrify/react';
+import type { NostrEvent } from '@nostrify/nostrify';
 import { useCurrentUser } from './useCurrentUser';
 import { useToast } from './useToast';
 import { DCOSL_RELAY, KINDS } from '@/lib/constants';
@@ -16,6 +17,7 @@ interface PublishReactionParams {
  * Intelligently handles replacing existing reactions from the same user
  */
 export function usePublishReaction() {
+  const { nostr } = useNostr();
   const { user } = useCurrentUser();
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -49,19 +51,18 @@ export function usePublishReaction() {
         created_at: Math.floor(Date.now() / 1000),
       });
       
-      console.log('Signed reaction event:', event);
+      console.log('Signed reaction event:', JSON.stringify(event, null, 2));
       
-      // Publish to the DCOSL relay
-      const relay = new NRelay1(DCOSL_RELAY);
+      // Publish to the DCOSL relay specifically
+      const relay = nostr.relay(DCOSL_RELAY);
       
       try {
-        await relay.event(event);
-        console.log('Reaction published successfully!');
+        await relay.event(event, { signal: AbortSignal.timeout(5000) });
+        console.log('Reaction published successfully to relay!');
       } catch (error) {
         console.error('Failed to publish reaction to relay:', error);
+        console.error('Event that failed:', JSON.stringify(event, null, 2));
         throw error;
-      } finally {
-        await relay.close();
       }
       
       return event;

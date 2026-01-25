@@ -19,6 +19,13 @@ export function MusicianCard({ musician, variant = 'default' }: MusicianCardProp
   const handleReaction = (reaction: '+' | '-') => {
     if (!user) return;
     
+    console.log('MusicianCard reaction params:', {
+      targetEventId: musician.id,
+      targetPubkey: musician.pubkey,
+      targetKind: musician.event.kind || KINDS.LIST_ITEM,
+      musicianEventKind: musician.event?.kind,
+    });
+    
     publishReaction({
       targetEventId: musician.id,
       targetPubkey: musician.pubkey,
