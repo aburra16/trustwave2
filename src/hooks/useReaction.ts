@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { NRelay1, type NostrEvent } from '@nostrify/nostrify';
 import { useCurrentUser } from './useCurrentUser';
+import { useToast } from './useToast';
 import { DCOSL_RELAY, KINDS } from '@/lib/constants';
 
 interface PublishReactionParams {
@@ -16,6 +17,7 @@ interface PublishReactionParams {
 export function usePublishReaction() {
   const { user } = useCurrentUser();
   const queryClient = useQueryClient();
+  const { toast } = useToast();
   
   return useMutation({
     mutationFn: async (params: PublishReactionParams): Promise<NostrEvent> => {
@@ -24,6 +26,8 @@ export function usePublishReaction() {
       }
       
       const { targetEventId, targetPubkey, targetKind, reaction } = params;
+      
+      console.log('Publishing reaction:', { reaction, targetEventId, targetPubkey, targetKind });
       
       // Create the reaction event
       const event = await user.signer.signEvent({
@@ -37,18 +41,30 @@ export function usePublishReaction() {
         created_at: Math.floor(Date.now() / 1000),
       });
       
+      console.log('Signed reaction event:', event);
+      
       // Publish to the DCOSL relay
       const relay = new NRelay1(DCOSL_RELAY);
       
       try {
         await relay.event(event);
+        console.log('Reaction published successfully!');
+      } catch (error) {
+        console.error('Failed to publish reaction to relay:', error);
+        throw error;
       } finally {
         await relay.close();
       }
       
       return event;
     },
-    onSuccess: () => {
+    onSuccess: (data, variables) => {
+      // Show success toast
+      toast({
+        title: variables.reaction === '+' ? 'Upvoted' : 'Downvoted',
+        description: 'Your vote has been recorded',
+      });
+      
       // Invalidate the lists to refresh scores
       queryClient.invalidateQueries({ queryKey: ['nostr', 'songsList'] });
       queryClient.invalidateQueries({ queryKey: ['nostr', 'musiciansList'] });
@@ -56,6 +72,11 @@ export function usePublishReaction() {
     },
     onError: (error) => {
       console.error('Failed to publish reaction:', error);
+      toast({
+        title: 'Failed to Vote',
+        description: error.message,
+        variant: 'destructive',
+      });
     },
   });
 }

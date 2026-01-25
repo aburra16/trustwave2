@@ -34,6 +34,7 @@ export function usePodcastIndexSearch(searchTerm: string, enabled = true) {
 
 /**
  * Get episodes/tracks for a specific podcast/artist feed
+ * Uses the /episodes/byfeedid endpoint proxied through the worker
  */
 export function usePodcastIndexEpisodes(feedId: number | string | undefined, enabled = true) {
   return useQuery({
@@ -41,19 +42,34 @@ export function usePodcastIndexEpisodes(feedId: number | string | undefined, ena
     queryFn: async (): Promise<PodcastIndexEpisode[]> => {
       if (!feedId) return [];
       
-      const response = await fetch(
-        `${PODCAST_INDEX_PROXY}/episodes?feedId=${feedId}`
-      );
-      
-      if (!response.ok) {
-        throw new Error(`Podcast Index episodes fetch failed: ${response.statusText}`);
+      try {
+        const url = `${PODCAST_INDEX_PROXY}/episodes/byfeedid?id=${feedId}&max=50`;
+        console.log('Fetching episodes from:', url);
+        
+        const response = await fetch(url);
+        
+        if (!response.ok) {
+          console.error(`Podcast Index episodes fetch failed: ${response.status} ${response.statusText}`);
+          const text = await response.text();
+          console.error('Response body:', text);
+          throw new Error(`Podcast Index episodes fetch failed: ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        console.log('Episodes API response:', data);
+        
+        // The API returns "items" array for episodes
+        const episodes = data.items || [];
+        console.log(`Fetched ${episodes.length} episodes for feed ${feedId}`);
+        return episodes;
+      } catch (error) {
+        console.error('Error fetching episodes:', error);
+        throw error;
       }
-      
-      const data: PodcastIndexEpisodesResponse = await response.json();
-      return data.items || [];
     },
     enabled: enabled && !!feedId,
     staleTime: 5 * 60 * 1000, // 5 minutes
+    retry: 1,
   });
 }
 

@@ -61,16 +61,30 @@ function parseListItem(event: NostrEvent): ListItem {
  * Fetch list items from the DCOSL relay
  */
 async function fetchListItems(listATag: string): Promise<ListItem[]> {
+  console.log(`Fetching list items for: ${listATag}`);
+  console.log(`Connecting to relay: ${DCOSL_RELAY}`);
+  
   const relay = new NRelay1(DCOSL_RELAY);
   
   try {
-    const events = await relay.query([{
+    const filter = {
       kinds: [KINDS.LIST_ITEM, KINDS.LIST_ITEM_REPLACEABLE],
       '#z': [listATag],
       limit: 500,
-    }]);
+    };
+    console.log('Query filter:', JSON.stringify(filter));
+    
+    const events = await relay.query([filter]);
+    console.log(`Fetched ${events.length} list items from relay`);
+    
+    if (events.length > 0) {
+      console.log('First event sample:', JSON.stringify(events[0], null, 2));
+    }
     
     return events.map(parseListItem);
+  } catch (error) {
+    console.error('Error fetching list items:', error);
+    throw error;
   } finally {
     await relay.close();
   }
@@ -161,20 +175,28 @@ function calculateScores(
  * Hook to fetch and score songs from the master songs list
  */
 export function useSongsList() {
-  const { data: trustMap, isLoading: trustLoading } = useTrustMap();
+  const { data: trustMap } = useTrustMap();
   const { user } = useCurrentUser();
   
   return useQuery({
-    queryKey: ['nostr', 'songsList', trustMap?.size],
+    queryKey: ['nostr', 'songsList'],
     queryFn: async (): Promise<ScoredListItem[]> => {
+      console.log('useSongsList: Fetching songs...');
+      
       // Fetch list items
       const items = await fetchListItems(SONGS_LIST_A_TAG);
+      console.log(`useSongsList: Found ${items.length} items`);
+      
+      if (items.length === 0) {
+        return [];
+      }
       
       // Fetch reactions for all items
       const itemIds = items.map(item => item.id);
       const reactions = await fetchReactions(itemIds);
+      console.log(`useSongsList: Found reactions for ${reactions.size} items`);
       
-      // Calculate scores
+      // Calculate scores (use empty trust map if not loaded - will show all items)
       const scoredItems = calculateScores(
         items, 
         reactions, 
@@ -183,11 +205,13 @@ export function useSongsList() {
       );
       
       // Filter out negative scores and sort by score descending
-      return scoredItems
+      const result = scoredItems
         .filter(item => item.score >= 0)
         .sort((a, b) => b.score - a.score);
+      
+      console.log(`useSongsList: Returning ${result.length} scored items`);
+      return result;
     },
-    enabled: !trustLoading,
     staleTime: 60 * 1000, // 1 minute
   });
 }
@@ -196,18 +220,26 @@ export function useSongsList() {
  * Hook to fetch and score musicians from the master musicians list
  */
 export function useMusiciansList() {
-  const { data: trustMap, isLoading: trustLoading } = useTrustMap();
+  const { data: trustMap } = useTrustMap();
   const { user } = useCurrentUser();
   
   return useQuery({
-    queryKey: ['nostr', 'musiciansList', trustMap?.size],
+    queryKey: ['nostr', 'musiciansList'],
     queryFn: async (): Promise<ScoredListItem[]> => {
+      console.log('useMusiciansList: Fetching musicians...');
+      
       // Fetch list items
       const items = await fetchListItems(MUSICIANS_LIST_A_TAG);
+      console.log(`useMusiciansList: Found ${items.length} items`);
+      
+      if (items.length === 0) {
+        return [];
+      }
       
       // Fetch reactions for all items
       const itemIds = items.map(item => item.id);
       const reactions = await fetchReactions(itemIds);
+      console.log(`useMusiciansList: Found reactions for ${reactions.size} items`);
       
       // Calculate scores
       const scoredItems = calculateScores(
@@ -218,11 +250,13 @@ export function useMusiciansList() {
       );
       
       // Filter out negative scores and sort by score descending
-      return scoredItems
+      const result = scoredItems
         .filter(item => item.score >= 0)
         .sort((a, b) => b.score - a.score);
+      
+      console.log(`useMusiciansList: Returning ${result.length} scored items`);
+      return result;
     },
-    enabled: !trustLoading,
     staleTime: 60 * 1000, // 1 minute
   });
 }
@@ -272,16 +306,23 @@ export function useGenreLists() {
  * Hook to fetch items from a specific genre sublist
  */
 export function useGenreListItems(listATag: string | undefined) {
-  const { data: trustMap, isLoading: trustLoading } = useTrustMap();
+  const { data: trustMap } = useTrustMap();
   const { user } = useCurrentUser();
   
   return useQuery({
-    queryKey: ['nostr', 'genreListItems', listATag, trustMap?.size],
+    queryKey: ['nostr', 'genreListItems', listATag],
     queryFn: async (): Promise<ScoredListItem[]> => {
       if (!listATag) return [];
       
+      console.log('useGenreListItems: Fetching items...');
+      
       // Fetch list items
       const items = await fetchListItems(listATag);
+      console.log(`useGenreListItems: Found ${items.length} items`);
+      
+      if (items.length === 0) {
+        return [];
+      }
       
       // Fetch reactions for all items
       const itemIds = items.map(item => item.id);
@@ -296,11 +337,14 @@ export function useGenreListItems(listATag: string | undefined) {
       );
       
       // Filter out negative scores and sort by score descending
-      return scoredItems
+      const result = scoredItems
         .filter(item => item.score >= 0)
         .sort((a, b) => b.score - a.score);
+      
+      console.log(`useGenreListItems: Returning ${result.length} scored items`);
+      return result;
     },
-    enabled: !trustLoading && !!listATag,
+    enabled: !!listATag,
     staleTime: 60 * 1000, // 1 minute
   });
 }

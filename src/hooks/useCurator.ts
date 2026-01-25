@@ -64,6 +64,8 @@ export function useAddSong() {
       // Add alt tag for NIP-31 (human-readable description)
       tags.push(['alt', `Song: ${episode.title} by ${feed.author || feed.title}`]);
       
+      console.log('Adding song with tags:', JSON.stringify(tags, null, 2));
+      
       // Create the list item event
       const event = await user.signer.signEvent({
         kind: KINDS.LIST_ITEM,
@@ -72,11 +74,18 @@ export function useAddSong() {
         created_at: Math.floor(Date.now() / 1000),
       });
       
+      console.log('Signed event:', JSON.stringify(event, null, 2));
+      console.log('Publishing song to relay:', DCOSL_RELAY);
+      
       // Publish to the DCOSL relay
       const relay = new NRelay1(DCOSL_RELAY);
       
       try {
         await relay.event(event);
+        console.log('Song event published successfully! Event ID:', event.id);
+      } catch (error) {
+        console.error('Failed to publish song event:', error);
+        throw error;
       } finally {
         await relay.close();
       }

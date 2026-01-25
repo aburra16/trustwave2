@@ -190,7 +190,14 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       dispatch({ type: 'SET_LOADING', loading: false });
     };
     
-    const handleError = () => {
+    const handleError = (e: Event) => {
+      const audioElement = e.target as HTMLAudioElement;
+      console.error('Audio error:', {
+        error: audioElement.error,
+        src: audioElement.src,
+        networkState: audioElement.networkState,
+        readyState: audioElement.readyState,
+      });
       dispatch({ type: 'SET_ERROR', error: 'Failed to load audio' });
     };
     
@@ -210,6 +217,11 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   }, []);
   
   const playTrack = useCallback((track: ScoredListItem, queue?: ScoredListItem[], index?: number) => {
+    console.log('Playing track:', {
+      title: track.songTitle,
+      url: track.songUrl,
+      hasUrl: !!track.songUrl,
+    });
     dispatch({ type: 'SET_TRACK', track, queue, index });
   }, []);
   
