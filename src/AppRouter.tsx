@@ -4,6 +4,7 @@ import { ScrollToTop } from "./components/ScrollToTop";
 import Discover from "./pages/Discover";
 import Songs from "./pages/Songs";
 import Musicians from "./pages/Musicians";
+import MusicianDetail from "./pages/MusicianDetail";
 import Search from "./pages/Search";
 import Curate from "./pages/Curate";
 import Settings from "./pages/Settings";
@@ -18,6 +19,7 @@ export function AppRouter() {
         <Route path="/" element={<Discover />} />
         <Route path="/songs" element={<Songs />} />
         <Route path="/musicians" element={<Musicians />} />
+        <Route path="/musician/:feedId" element={<MusicianDetail />} />
         <Route path="/search" element={<Search />} />
         <Route path="/curate" element={<Curate />} />
         <Route path="/settings" element={<Settings />} />

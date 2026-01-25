@@ -62,11 +62,16 @@ export function MusicianCard({ musician, variant = 'default' }: MusicianCardProp
     );
   }
   
+  const feedId = musician.feedId || musician.musicianFeedGuid;
+  
   return (
-    <div className={cn(
-      'group relative rounded-xl overflow-hidden bg-card border border-border/50 transition-all duration-200',
-      'hover:border-primary/30 hover:shadow-lg hover:shadow-primary/5'
-    )}>
+    <Link 
+      to={feedId ? `/musician/${feedId}` : '#'}
+      className={cn(
+        'group relative rounded-xl overflow-hidden bg-card border border-border/50 transition-all duration-200 block',
+        'hover:border-primary/30 hover:shadow-lg hover:shadow-primary/5 cursor-pointer'
+      )}
+    >
       {/* Artist Image */}
       <div className="aspect-square relative">
         {artwork ? (
@@ -106,7 +111,7 @@ export function MusicianCard({ musician, variant = 'default' }: MusicianCardProp
       </div>
       
       {/* Actions */}
-      <div className="p-3 flex items-center justify-between">
+      <div className="p-3 flex items-center justify-between" onClick={(e) => e.preventDefault()}>
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-1 text-sm">
             <ThumbsUp className="w-4 h-4 text-tw-success" />
@@ -127,7 +132,10 @@ export function MusicianCard({ musician, variant = 'default' }: MusicianCardProp
                 variant="ghost"
                 size="icon"
                 className="h-8 w-8"
-                onClick={() => handleReaction('+')}
+                onClick={(e) => {
+                  e.preventDefault();
+                  handleReaction('+');
+                }}
                 disabled={isReacting}
               >
                 <ThumbsUp className={cn(
@@ -139,7 +147,10 @@ export function MusicianCard({ musician, variant = 'default' }: MusicianCardProp
                 variant="ghost"
                 size="icon"
                 className="h-8 w-8"
-                onClick={() => handleReaction('-')}
+                onClick={(e) => {
+                  e.preventDefault();
+                  handleReaction('-');
+                }}
                 disabled={isReacting}
               >
                 <ThumbsDown className={cn(
@@ -149,21 +160,8 @@ export function MusicianCard({ musician, variant = 'default' }: MusicianCardProp
               </Button>
             </>
           )}
-          
-          {musician.musicianFeedUrl && (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8"
-              asChild
-            >
-              <a href={musician.musicianFeedUrl} target="_blank" rel="noopener noreferrer">
-                <ExternalLink className="w-4 h-4" />
-              </a>
-            </Button>
-          )}
         </div>
       </div>
-    </div>
+    </Link>
   );
 }

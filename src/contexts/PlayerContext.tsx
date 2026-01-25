@@ -154,8 +154,15 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   // Update audio source when track changes
   useEffect(() => {
     const audio = audioRef.current;
-    if (!audio || !state.currentTrack?.songUrl) return;
+    if (!audio) return;
     
+    if (!state.currentTrack?.songUrl) {
+      console.error('No songUrl available for current track:', state.currentTrack);
+      dispatch({ type: 'SET_ERROR', error: 'No audio URL available' });
+      return;
+    }
+    
+    console.log('Loading audio from URL:', state.currentTrack.songUrl);
     dispatch({ type: 'SET_LOADING', loading: true });
     audio.src = state.currentTrack.songUrl;
     audio.load();
