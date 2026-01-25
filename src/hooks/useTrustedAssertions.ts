@@ -193,10 +193,16 @@ async function fetchTrustAssertions(
       console.log(`Fetched ${events.length} assertions in this batch`);
       totalFetched += events.length;
       
+      let parsedCount = 0;
+      let skippedCount = 0;
+      
       for (const event of events) {
         const assertion = parseTrustedAssertion(event);
         if (assertion) {
           trustMap.set(assertion.pubkey, assertion.rank);
+          parsedCount++;
+        } else {
+          skippedCount++;
         }
         
         // Track oldest timestamp for next batch
@@ -204,6 +210,8 @@ async function fetchTrustAssertions(
           oldestTimestamp = event.created_at;
         }
       }
+      
+      console.log(`Parsed ${parsedCount} valid assertions, skipped ${skippedCount}`);
       
       // If we got fewer events than the batch size, we've reached the end
       if (events.length < BATCH_SIZE) {
@@ -219,8 +227,14 @@ async function fetchTrustAssertions(
     
     await relay.close();
     
-    console.log(`✅ Fetched ${totalFetched} total trust assertions`);
-    console.log(`📊 Trust map contains ${trustMap.size} unique pubkeys`);
+    console.log(`✅ Fetched ${totalFetched} total trust assertion events`);
+    console.log(`📊 Trust map contains ${trustMap.size} unique pubkeys with rank scores`);
+    
+    // Show distribution of rank scores
+    const ranks = Array.from(trustMap.values());
+    const above50 = ranks.filter(r => r > 50).length;
+    const above10 = ranks.filter(r => r > 10).length;
+    console.log(`📈 Rank distribution: ${above50} pubkeys > 50, ${above10} pubkeys > 10`);
     
   } catch (error) {
     console.error('Failed to fetch trust assertions:', error);
