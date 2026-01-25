@@ -185,7 +185,28 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     // Set source and load
     audio.pause(); // Pause any current playback
     audio.src = state.currentTrack.songUrl;
+    
+    // Set up one-time listener to auto-play when ready
+    const handleLoadedData = () => {
+      console.log('Audio loaded and ready to play');
+      dispatch({ type: 'SET_LOADING', loading: false });
+      
+      // Auto-play if we're supposed to be playing
+      if (isPlayingRef.current) {
+        console.log('Auto-playing loaded audio...');
+        audio.play().catch(error => {
+          console.error('Auto-play failed:', error);
+          dispatch({ type: 'SET_ERROR', error: 'Failed to play audio' });
+        });
+      }
+    };
+    
+    audio.addEventListener('loadeddata', handleLoadedData, { once: true });
     audio.load();
+    
+    return () => {
+      audio.removeEventListener('loadeddata', handleLoadedData);
+    };
   }, [state.currentTrack?.id]);
   
   // Set volume

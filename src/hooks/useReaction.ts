@@ -65,10 +65,14 @@ export function usePublishReaction() {
         description: 'Your vote has been recorded',
       });
       
-      // Invalidate the lists to refresh scores
+      // Force refetch the lists to refresh scores
       queryClient.invalidateQueries({ queryKey: ['nostr', 'songsList'] });
       queryClient.invalidateQueries({ queryKey: ['nostr', 'musiciansList'] });
       queryClient.invalidateQueries({ queryKey: ['nostr', 'genreListItems'] });
+      
+      // Also refetch immediately
+      queryClient.refetchQueries({ queryKey: ['nostr', 'songsList'] });
+      queryClient.refetchQueries({ queryKey: ['nostr', 'musiciansList'] });
     },
     onError: (error) => {
       console.error('Failed to publish reaction:', error);

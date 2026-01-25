@@ -38,9 +38,9 @@ export function BoostDialog({ feedId, children }: BoostDialogProps) {
   const { state } = usePlayer();
   const { hasWallet, sendPayment } = useWallet();
   
-  // Get value info for the current track's feed
-  const trackFeedId = feedId || state.currentTrack?.feedId;
-  const { data: valueInfo, isLoading: loadingValue } = usePodcastIndexValue(trackFeedId, open);
+  // Value info - will be implemented when worker supports /value endpoint
+  const valueInfo = null;
+  const loadingValue = false;
   
   const handleAmountClick = (amt: number) => {
     setAmount(amt);

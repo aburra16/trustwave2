@@ -144,15 +144,17 @@ function calculateScores(
     for (const reaction of itemReactions) {
       const authorRank = trustMap.get(reaction.pubkey) || 0;
       const isTrusted = authorRank > TRUST_THRESHOLD;
+      const isCurrentUser = reaction.pubkey === userPubkey;
       
       // Check if this is the current user's reaction
-      if (reaction.pubkey === userPubkey) {
+      if (isCurrentUser) {
         userReaction = reaction.content === '+' ? '+' : 
                        reaction.content === '-' ? '-' : null;
       }
       
-      // Only count reactions from trusted users
-      if (!isTrusted) continue;
+      // Count reactions from trusted users OR the current user
+      // (so users can always see their own votes)
+      if (!isTrusted && !isCurrentUser) continue;
       
       if (reaction.content === '+' || reaction.content === '') {
         upvotes++;
