@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { SongCard } from '@/components/songs/SongCard';
 import { Skeleton } from '@/components/ui/skeleton';
 import { usePodcastIndexEpisodes, usePodcastIndexFeed } from '@/hooks/usePodcastIndex';
+import { usePodcastIndexFeedByGuid } from '@/hooks/usePodcastIndexByGuid';
 import { useMusiciansList } from '@/hooks/useDecentralizedList';
 import { usePublishReaction } from '@/hooks/useReaction';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
@@ -14,27 +15,45 @@ import { APP_NAME, KINDS } from '@/lib/constants';
 import type { ScoredListItem } from '@/lib/types';
 
 export default function MusicianDetail() {
-  const { feedId } = useParams<{ feedId: string }>();
+  const { feedId: urlFeedId } = useParams<{ feedId: string }>();
   const { user } = useCurrentUser();
   
-  // Find the musician from the list
+  // Find the musician from the list by feedGuid (podcast GUID) or feedId
   const { data: musicians, isLoading: loadingMusicians } = useMusiciansList();
   const musician = musicians?.find(m => 
-    m.feedId === feedId || 
-    m.musicianFeedGuid === feedId ||
-    String(m.feedId) === feedId
+    m.feedGuid === urlFeedId || 
+    m.musicianFeedGuid === urlFeedId ||
+    m.feedId === urlFeedId ||
+    String(m.feedId) === urlFeedId
   );
   
-  console.log('MusicianDetail:', { feedId, musician, musicians });
+  console.log('MusicianDetail:', { 
+    urlFeedId, 
+    musician,
+    musicianFeedId: musician?.feedId,
+    musicianFeedGuid: musician?.feedGuid,
+  });
   
-  // Use the feedId from the musician if we found them, otherwise use the URL param
-  const actualFeedId = musician?.feedId || feedId;
+  // Determine which ID to use for fetching
+  // If musician has numeric feedId, use that (most reliable)
+  // Otherwise, try to look up by GUID and get the numeric ID
+  const isGuid = urlFeedId?.includes('-'); // GUIDs have dashes
+  const numericFeedId = musician?.feedId;
   
-  // Fetch feed data and episodes from Podcast Index
+  // If URL has GUID but we don't have numeric ID, try to look up the feed
+  const { data: feedByGuid } = usePodcastIndexFeedByGuid(
+    isGuid && !numericFeedId ? urlFeedId : undefined
+  );
+  
+  // Use numeric ID from musician, or from the feedByGuid lookup, or try the URL param
+  const actualFeedId = numericFeedId || feedByGuid?.id || (!isGuid ? urlFeedId : undefined);
+  
+  // Fetch feed data and episodes from Podcast Index using numeric ID
   const { data: feed } = usePodcastIndexFeed(actualFeedId);
   const { data: episodes, isLoading: loadingEpisodes } = usePodcastIndexEpisodes(actualFeedId);
   
-  console.log('Fetched episodes:', episodes);
+  console.log('Using numeric feedId:', actualFeedId);
+  console.log('Fetched episodes:', episodes?.length, 'episodes');
   
   const { mutate: publishReaction, isPending: isReacting } = usePublishReaction();
   
@@ -51,6 +70,7 @@ export default function MusicianDetail() {
       targetPubkey: musician.pubkey,
       targetKind: musician.event.kind || KINDS.LIST_ITEM,
       reaction,
+      currentReaction: musician.userReaction,
     });
   };
   

@@ -24,15 +24,23 @@ export function MusicianCard({ musician, variant = 'default' }: MusicianCardProp
       targetPubkey: musician.pubkey,
       targetKind: musician.event.kind || KINDS.LIST_ITEM,
       reaction,
+      currentReaction: musician.userReaction,
     });
   };
   
   const name = musician.musicianName || musician.name || 'Unknown Artist';
   const artwork = musician.musicianArtwork || musician.songArtwork;
   
+  // Use feedGuid (podcast GUID) as the primary identifier for navigation
+  // Fallback to feedId only if feedGuid is not available
+  const musicianId = musician.feedGuid || musician.musicianFeedGuid || musician.feedId;
+  
   if (variant === 'compact') {
     return (
-      <div className="group flex items-center gap-3 p-2 rounded-lg hover:bg-secondary/50 transition-all">
+      <Link 
+        to={musicianId ? `/musician/${musicianId}` : '#'}
+        className="group flex items-center gap-3 p-2 rounded-lg hover:bg-secondary/50 transition-all block"
+      >
         {/* Avatar */}
         <div className="w-10 h-10 rounded-full overflow-hidden bg-secondary flex-shrink-0">
           {artwork ? (
@@ -58,15 +66,13 @@ export function MusicianCard({ musician, variant = 'default' }: MusicianCardProp
           <ThumbsUp className="w-3 h-3" />
           <span>{musician.upvotes}</span>
         </div>
-      </div>
+      </Link>
     );
   }
   
-  const feedId = musician.feedId || musician.musicianFeedGuid;
-  
   return (
     <Link 
-      to={feedId ? `/musician/${feedId}` : '#'}
+      to={musicianId ? `/musician/${musicianId}` : '#'}
       className={cn(
         'group relative rounded-xl overflow-hidden bg-card border border-border/50 transition-all duration-200 block',
         'hover:border-primary/30 hover:shadow-lg hover:shadow-primary/5 cursor-pointer'

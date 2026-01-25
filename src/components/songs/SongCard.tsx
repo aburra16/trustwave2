@@ -47,6 +47,7 @@ export function SongCard({ song, index = 0, queue = [], variant = 'default' }: S
       targetPubkey: song.pubkey,
       targetKind: song.event.kind || KINDS.LIST_ITEM,
       reaction,
+      currentReaction: song.userReaction,
     });
   };
   

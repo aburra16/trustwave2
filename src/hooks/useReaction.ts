@@ -13,6 +13,7 @@ interface PublishReactionParams {
 
 /**
  * Hook to publish a reaction (thumbs up/down) to a list item
+ * Intelligently handles replacing existing reactions from the same user
  */
 export function usePublishReaction() {
   const { user } = useCurrentUser();
@@ -20,14 +21,20 @@ export function usePublishReaction() {
   const { toast } = useToast();
   
   return useMutation({
-    mutationFn: async (params: PublishReactionParams): Promise<NostrEvent> => {
+    mutationFn: async (params: PublishReactionParams & { currentReaction?: '+' | '-' | null }): Promise<NostrEvent | null> => {
       if (!user) {
         throw new Error('You must be logged in to react');
       }
       
-      const { targetEventId, targetPubkey, targetKind, reaction } = params;
+      const { targetEventId, targetPubkey, targetKind, reaction, currentReaction } = params;
       
-      console.log('Publishing reaction:', { reaction, targetEventId, targetPubkey, targetKind });
+      // If user clicks the same reaction they already made, remove it (don't publish)
+      if (currentReaction === reaction) {
+        console.log('User clicked same reaction - ignoring (already voted this way)');
+        return null;
+      }
+      
+      console.log('Publishing reaction:', { reaction, targetEventId, targetPubkey, targetKind, currentReaction });
       
       // Create the reaction event
       const event = await user.signer.signEvent({
@@ -59,20 +66,22 @@ export function usePublishReaction() {
       return event;
     },
     onSuccess: (data, variables) => {
-      // Show success toast
-      toast({
-        title: variables.reaction === '+' ? 'Upvoted' : 'Downvoted',
-        description: 'Your vote has been recorded',
-      });
-      
-      // Force refetch the lists to refresh scores
-      queryClient.invalidateQueries({ queryKey: ['nostr', 'songsList'] });
-      queryClient.invalidateQueries({ queryKey: ['nostr', 'musiciansList'] });
-      queryClient.invalidateQueries({ queryKey: ['nostr', 'genreListItems'] });
-      
-      // Also refetch immediately
-      queryClient.refetchQueries({ queryKey: ['nostr', 'songsList'] });
-      queryClient.refetchQueries({ queryKey: ['nostr', 'musiciansList'] });
+      // Only show toast if we actually published something
+      if (data !== null) {
+        toast({
+          title: variables.reaction === '+' ? 'Upvoted' : 'Downvoted',
+          description: 'Your vote has been recorded',
+        });
+        
+        // Force refetch the lists to refresh scores
+        queryClient.invalidateQueries({ queryKey: ['nostr', 'songsList'] });
+        queryClient.invalidateQueries({ queryKey: ['nostr', 'musiciansList'] });
+        queryClient.invalidateQueries({ queryKey: ['nostr', 'genreListItems'] });
+        
+        // Also refetch immediately
+        queryClient.refetchQueries({ queryKey: ['nostr', 'songsList'] });
+        queryClient.refetchQueries({ queryKey: ['nostr', 'musiciansList'] });
+      }
     },
     onError: (error) => {
       console.error('Failed to publish reaction:', error);

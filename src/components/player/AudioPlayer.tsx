@@ -61,6 +61,7 @@ export function AudioPlayer() {
       targetPubkey: currentTrack.pubkey,
       targetKind: currentTrack.event.kind || KINDS.LIST_ITEM,
       reaction,
+      currentReaction: currentTrack.userReaction,
     });
   };
   
