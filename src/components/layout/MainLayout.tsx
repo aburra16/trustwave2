@@ -1,6 +1,6 @@
 import { ReactNode } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Music, Users, Search, Radio, Plus, Settings } from 'lucide-react';
+import { Music, Users, Search, Radio, Plus, Settings, ListChecks } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { LoginArea } from '@/components/auth/LoginArea';
 import { AudioPlayer } from '@/components/player/AudioPlayer';
@@ -17,6 +17,7 @@ const navItems = [
   { path: '/musicians', label: 'Musicians', icon: Users },
   { path: '/search', label: 'Search', icon: Search },
   { path: '/curate', label: 'Curate', icon: Plus },
+  { path: '/manage', label: 'Manage', icon: ListChecks },
 ];
 
 export function MainLayout({ children }: MainLayoutProps) {
