@@ -23,6 +23,82 @@ export function usePublishReaction() {
   const { toast } = useToast();
   
   return useMutation({
+    // Optimistically update the UI before the mutation
+    onMutate: async (params: PublishReactionParams & { currentReaction?: '+' | '-' | null }) => {
+      const { targetEventId, reaction, currentReaction } = params;
+      
+      // If clicking same reaction, do nothing
+      if (currentReaction === reaction) {
+        return { rollback: false };
+      }
+      
+      console.log('Optimistic update: applying vote immediately');
+      
+      // Cancel any outgoing refetches
+      await queryClient.cancelQueries({ queryKey: ['nostr', 'songsList'] });
+      await queryClient.cancelQueries({ queryKey: ['nostr', 'musiciansList'] });
+      
+      // Get current data
+      const previousSongs = queryClient.getQueryData(['nostr', 'songsList']);
+      const previousMusicians = queryClient.getQueryData(['nostr', 'musiciansList']);
+      
+      // Update songs list optimistically
+      queryClient.setQueryData(['nostr', 'songsList'], (old: any) => {
+        if (!old) return old;
+        return old.map((item: any) => {
+          if (item.id !== targetEventId) return item;
+          
+          // Calculate new votes
+          let upvotes = item.upvotes;
+          let downvotes = item.downvotes;
+          
+          // Remove old vote if changing
+          if (currentReaction === '+') upvotes--;
+          if (currentReaction === '-') downvotes--;
+          
+          // Add new vote
+          if (reaction === '+') upvotes++;
+          if (reaction === '-') downvotes++;
+          
+          return {
+            ...item,
+            upvotes,
+            downvotes,
+            score: upvotes - downvotes,
+            userReaction: reaction,
+          };
+        });
+      });
+      
+      // Update musicians list optimistically
+      queryClient.setQueryData(['nostr', 'musiciansList'], (old: any) => {
+        if (!old) return old;
+        return old.map((item: any) => {
+          if (item.id !== targetEventId) return item;
+          
+          let upvotes = item.upvotes;
+          let downvotes = item.downvotes;
+          
+          if (currentReaction === '+') upvotes--;
+          if (currentReaction === '-') downvotes--;
+          
+          if (reaction === '+') upvotes++;
+          if (reaction === '-') downvotes++;
+          
+          return {
+            ...item,
+            upvotes,
+            downvotes,
+            score: upvotes - downvotes,
+            userReaction: reaction,
+          };
+        });
+      });
+      
+      // Return context for rollback
+      return { previousSongs, previousMusicians, rollback: true };
+    },
+    
     mutationFn: async (params: PublishReactionParams & { currentReaction?: '+' | '-' | null }): Promise<NostrEvent | null> => {
       if (!user) {
         throw new Error('You must be logged in to react');
@@ -67,26 +143,32 @@ export function usePublishReaction() {
       
       return event;
     },
-    onSuccess: (data, variables) => {
+    onSuccess: (data, variables, context) => {
       // Only show toast if we actually published something
       if (data !== null) {
         toast({
           title: variables.reaction === '+' ? 'Upvoted' : 'Downvoted',
           description: 'Your vote has been recorded',
         });
-        
-        // Force refetch the lists to refresh scores
-        queryClient.invalidateQueries({ queryKey: ['nostr', 'songsList'] });
-        queryClient.invalidateQueries({ queryKey: ['nostr', 'musiciansList'] });
-        queryClient.invalidateQueries({ queryKey: ['nostr', 'genreListItems'] });
-        
-        // Also refetch immediately
-        queryClient.refetchQueries({ queryKey: ['nostr', 'songsList'] });
-        queryClient.refetchQueries({ queryKey: ['nostr', 'musiciansList'] });
       }
+      
+      // Invalidate to ensure fresh data on next load
+      queryClient.invalidateQueries({ queryKey: ['nostr', 'songsListItems'] });
+      queryClient.invalidateQueries({ queryKey: ['nostr', 'musiciansListItems'] });
     },
-    onError: (error) => {
+    onError: (error, variables, context) => {
       console.error('Failed to publish reaction:', error);
+      
+      // Rollback optimistic update
+      if (context?.rollback) {
+        if (context.previousSongs) {
+          queryClient.setQueryData(['nostr', 'songsList'], context.previousSongs);
+        }
+        if (context.previousMusicians) {
+          queryClient.setQueryData(['nostr', 'musiciansList'], context.previousMusicians);
+        }
+      }
+      
       toast({
         title: 'Failed to Vote',
         description: error.message,
