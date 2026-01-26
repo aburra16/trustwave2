@@ -96,12 +96,10 @@ export function useTrustProviders() {
         }
       }
       
-      // Default to genesis curator's trust providers
-      return [{
-        service: '30382:rank',
-        pubkey: GENESIS_CURATOR_PUBKEY,
-        relay: NIP85_RELAY,
-      }];
+      // No fallback - user has no trust providers
+      // They will see all songs with zero scores (no votes counted except their own)
+      console.log('No kind 10040 found for user - no trust providers');
+      return [];
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
@@ -117,20 +115,10 @@ export function useTrustMap() {
   return useQuery({
     queryKey: ['nostr', 'trustMap', providers?.map(p => p.pubkey).join(',')],
     queryFn: async (): Promise<Map<string, number>> => {
-      let trustMap = new Map<string, number>();
-      
+      // No providers = no trust data (return empty map)
       if (!providers || providers.length === 0) {
-        console.log('No trust providers found, using genesis curator fallback');
-        // Fallback: use genesis curator as trust source
-        trustMap = await fetchTrustAssertions(GENESIS_CURATOR_PUBKEY, NIP85_RELAY);
-        
-        // TODO: Add fallback relay once it's configured with wss:// (not ws://)
-        // if (trustMap.size === 0) {
-        //   console.log('Primary relay had no data, trying fallback relay...');
-        //   trustMap = await fetchTrustAssertions(GENESIS_CURATOR_PUBKEY, NIP85_FALLBACK_RELAY);
-        // }
-        
-        return trustMap;
+        console.log('No trust providers - empty trust map');
+        return new Map();
       }
       
       // Find the rank provider
@@ -139,10 +127,10 @@ export function useTrustMap() {
         return fetchTrustAssertions(rankProvider.pubkey, rankProvider.relay);
       }
       
-      return trustMap;
+      return new Map();
     },
     enabled: !providersLoading,
-    staleTime: 10 * 60 * 1000, // 10 minutes (longer since we're fetching a lot)
+    staleTime: 10 * 60 * 1000,
   });
 }
 

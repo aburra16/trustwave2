@@ -1,7 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
 import { NRelay1 } from '@nostrify/nostrify';
 import { useTrustProviders } from './useTrustedAssertions';
-import { KINDS, GENESIS_CURATOR_PUBKEY, NIP85_RELAY } from '@/lib/constants';
+import { useCurrentUser } from './useCurrentUser';
+import { KINDS } from '@/lib/constants';
 
 /**
  * Hook to fetch a single user's trust score
@@ -9,11 +10,28 @@ import { KINDS, GENESIS_CURATOR_PUBKEY, NIP85_RELAY } from '@/lib/constants';
  */
 export function useTrustScore(subjectPubkey: string | undefined) {
   const { data: providers } = useTrustProviders();
+  const { user } = useCurrentUser();
   
   // Get the service provider info (who calculates the scores)
   const rankProvider = providers?.find(p => p.service === '30382:rank');
-  const serviceProviderPubkey = rankProvider?.pubkey || GENESIS_CURATOR_PUBKEY;
-  const serviceRelay = rankProvider?.relay || NIP85_RELAY;
+  const serviceProviderPubkey = rankProvider?.pubkey;
+  const serviceRelay = rankProvider?.relay;
+  
+  // If checking the current user's own score, return 100
+  if (subjectPubkey === user?.pubkey) {
+    return {
+      data: 100,
+      isLoading: false,
+    } as any;
+  }
+  
+  // If no service provider, return 0
+  if (!serviceProviderPubkey || !serviceRelay) {
+    return {
+      data: 0,
+      isLoading: false,
+    } as any;
+  }
   
   return useQuery({
     queryKey: ['trustScore', subjectPubkey, serviceProviderPubkey],
@@ -59,20 +77,32 @@ export function useTrustScore(subjectPubkey: string | undefined) {
  */
 export function useBatchTrustScores(pubkeys: string[]) {
   const { data: providers } = useTrustProviders();
+  const { user } = useCurrentUser();
   
   const rankProvider = providers?.find(p => p.service === '30382:rank');
-  const serviceProviderPubkey = rankProvider?.pubkey || GENESIS_CURATOR_PUBKEY;
-  const serviceRelay = rankProvider?.relay || NIP85_RELAY;
+  const serviceProviderPubkey = rankProvider?.pubkey;
+  const serviceRelay = rankProvider?.relay;
   
   return useQuery({
     queryKey: ['batchTrustScores', pubkeys.join(','), serviceProviderPubkey],
     queryFn: async (): Promise<Map<string, number>> => {
       if (pubkeys.length === 0) return new Map();
       
+      const trustScores = new Map<string, number>();
+      
+      // If no service provider, return empty map (no one is trusted)
+      // EXCEPT the current user always has rank 100 from their own perspective
+      if (!serviceProviderPubkey || !serviceRelay) {
+        console.log('No trust provider configured - only counting user\'s own votes');
+        if (user?.pubkey) {
+          trustScores.set(user.pubkey, 100); // User always trusts themselves
+        }
+        return trustScores;
+      }
+      
       console.log(`Batch fetching trust scores for ${pubkeys.length} pubkeys from ${serviceRelay}`);
       
       const relay = new NRelay1(serviceRelay);
-      const trustScores = new Map<string, number>();
       
       try {
         // Fetch all in one query using #d filter
@@ -95,7 +125,12 @@ export function useBatchTrustScores(pubkeys: string[]) {
           }
         }
         
-        console.log(`Parsed ${trustScores.size} trust scores`);
+        // User always trusts themselves (rank 100)
+        if (user?.pubkey) {
+          trustScores.set(user.pubkey, 100);
+        }
+        
+        console.log(`Parsed ${trustScores.size} trust scores (including self)`);
         
         // Log some stats
         const ranks = Array.from(trustScores.values());

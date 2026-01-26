@@ -3,6 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { Music, Users, Search, Radio, Plus, Settings, ListChecks } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { LoginArea } from '@/components/auth/LoginArea';
+import { PersonalizeButton } from '@/components/PersonalizeButton';
 import { AudioPlayer } from '@/components/player/AudioPlayer';
 import { usePlayer } from '@/contexts/PlayerContext';
 import { APP_NAME } from '@/lib/constants';
@@ -65,8 +66,9 @@ export function MainLayout({ children }: MainLayoutProps) {
               })}
             </nav>
             
-            {/* Right side - Login & Settings */}
+            {/* Right side - Personalize, Settings & Login */}
             <div className="flex items-center gap-3">
+              <PersonalizeButton />
               <Link
                 to="/settings"
                 className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
