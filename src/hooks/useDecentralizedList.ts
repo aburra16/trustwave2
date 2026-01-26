@@ -168,6 +168,8 @@ function calculateScores(
     let totalReactions = 0;
     let trustedReactions = 0;
     let filteredReactions = 0;
+    const upvoterEvents: NostrEvent[] = [];
+    const downvoterEvents: NostrEvent[] = [];
     
     // Now count the latest reaction from each user
     for (const reaction of reactionsByAuthor.values()) {
@@ -192,8 +194,10 @@ function calculateScores(
       
       if (reaction.content === '+' || reaction.content === '') {
         upvotes++;
+        upvoterEvents.push(reaction);
       } else if (reaction.content === '-') {
         downvotes++;
+        downvoterEvents.push(reaction);
       }
     }
     
@@ -208,6 +212,8 @@ function calculateScores(
       upvotes,
       downvotes,
       userReaction,
+      upvoterEvents,
+      downvoterEvents,
     };
   });
 }

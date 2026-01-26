@@ -10,6 +10,7 @@ import {
 import { usePlayer } from '@/contexts/PlayerContext';
 import { usePublishReaction } from '@/hooks/useReaction';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
+import { VotersList } from './VotersList';
 import { KINDS } from '@/lib/constants';
 import type { ScoredListItem } from '@/lib/types';
 
@@ -119,6 +120,16 @@ export function SongCard({ song, index = 0, queue = [], variant = 'default' }: S
           <p className="text-xs text-muted-foreground truncate">
             {song.songArtist || 'Unknown Artist'}
           </p>
+          
+          {/* Voters */}
+          {(song.upvoterEvents || song.downvoterEvents) && (
+            <div className="mt-2">
+              <VotersList 
+                upvoters={song.upvoterEvents || []} 
+                downvoters={song.downvoterEvents || []} 
+              />
+            </div>
+          )}
         </div>
       </div>
     );
@@ -226,17 +237,27 @@ export function SongCard({ song, index = 0, queue = [], variant = 'default' }: S
         {formatDuration(song.songDuration)}
       </span>
       
-      {/* Score */}
-      <div className="flex items-center gap-2 px-3">
-        <div className="flex items-center gap-1 text-tw-success">
-          <ThumbsUp className="w-4 h-4" />
-          <span className="text-sm font-medium">{song.upvotes}</span>
-        </div>
-        {song.downvotes > 0 && (
-          <div className="flex items-center gap-1 text-muted-foreground">
-            <ThumbsDown className="w-4 h-4" />
-            <span className="text-sm">{song.downvotes}</span>
+      {/* Score & Voters */}
+      <div className="flex items-center gap-3 px-3">
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 text-tw-success">
+            <ThumbsUp className="w-4 h-4" />
+            <span className="text-sm font-medium">{song.upvotes}</span>
           </div>
+          {song.downvotes > 0 && (
+            <div className="flex items-center gap-1 text-muted-foreground">
+              <ThumbsDown className="w-4 h-4" />
+              <span className="text-sm">{song.downvotes}</span>
+            </div>
+          )}
+        </div>
+        
+        {/* Who voted */}
+        {(song.upvoterEvents || song.downvoterEvents) && (
+          <VotersList 
+            upvoters={song.upvoterEvents || []} 
+            downvoters={song.downvoterEvents || []} 
+          />
         )}
       </div>
       

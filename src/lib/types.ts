@@ -126,6 +126,8 @@ export interface ScoredListItem extends ListItem {
   upvotes: number;
   downvotes: number;
   userReaction?: '+' | '-' | null;
+  upvoterEvents?: NostrEvent[]; // Reaction events from upvoters
+  downvoterEvents?: NostrEvent[]; // Reaction events from downvoters
 }
 
 // Trust assertion types (NIP-85)
