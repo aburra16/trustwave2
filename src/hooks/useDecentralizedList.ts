@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useNostr } from '@nostrify/react';
 import { NRelay1, type NostrEvent } from '@nostrify/nostrify';
-import { useTrustMap } from './useTrustedAssertions';
+import { useBatchTrustScores } from './useTrustScore';
 import { useCurrentUser } from './useCurrentUser';
 import { useHiddenItems } from './useHiddenItems';
 import { 
@@ -142,10 +142,10 @@ async function fetchReactions(itemIds: string[]): Promise<Map<string, NostrEvent
 function calculateScores(
   items: ListItem[],
   reactions: Map<string, NostrEvent[]>,
-  trustMap: Map<string, number>,
+  trustScores: Map<string, number>,
   userPubkey?: string
 ): ScoredListItem[] {
-  console.log(`Calculating scores with trust map containing ${trustMap.size} pubkeys`);
+  console.log(`Calculating scores with trust scores for ${trustScores.size} pubkeys`);
   
   return items.map(item => {
     const itemReactions = reactions.get(item.id) || [];
@@ -172,7 +172,7 @@ function calculateScores(
     // Now count the latest reaction from each user
     for (const reaction of reactionsByAuthor.values()) {
       totalReactions++;
-      const authorRank = trustMap.get(reaction.pubkey) || 0;
+      const authorRank = trustScores.get(reaction.pubkey) || 0;
       const isTrusted = authorRank > TRUST_THRESHOLD;
       const isCurrentUser = reaction.pubkey === userPubkey;
       
@@ -214,43 +214,62 @@ function calculateScores(
 
 /**
  * Hook to fetch and score songs from the master songs list
+ * Uses on-demand trust score lookups (efficient)
  */
 export function useSongsList() {
-  const { data: trustMap } = useTrustMap();
   const { user } = useCurrentUser();
   const { hiddenIds } = useHiddenItems();
   
-  return useQuery({
-    queryKey: ['nostr', 'songsList', hiddenIds.length],
-    queryFn: async (): Promise<ScoredListItem[]> => {
+  // First, fetch items and reactions without trust scores
+  const itemsQuery = useQuery({
+    queryKey: ['nostr', 'songsListItems', hiddenIds.length],
+    queryFn: async () => {
       console.log('useSongsList: Fetching songs...');
       
-      // Fetch list items
       const items = await fetchListItems(SONGS_LIST_A_TAG);
       console.log(`useSongsList: Found ${items.length} items`);
       
-      if (items.length === 0) {
-        return [];
-      }
+      if (items.length === 0) return { items: [], reactions: new Map() };
       
-      // Filter out hidden items
       const visibleItems = items.filter(item => !hiddenIds.includes(item.id));
       console.log(`useSongsList: ${visibleItems.length} visible after filtering ${hiddenIds.length} hidden`);
       
-      // Fetch reactions for all items
       const itemIds = visibleItems.map(item => item.id);
       const reactions = await fetchReactions(itemIds);
       console.log(`useSongsList: Found reactions for ${reactions.size} items`);
       
-      // Calculate scores (use empty trust map if not loaded - will show all items)
+      return { items: visibleItems, reactions };
+    },
+    staleTime: 60 * 1000,
+  });
+  
+  // Get all unique reaction authors
+  const reactionAuthors = Array.from(
+    new Set(
+      Array.from(itemsQuery.data?.reactions.values() || [])
+        .flat()
+        .map(r => r.pubkey)
+    )
+  );
+  
+  // Batch fetch trust scores for all reaction authors
+  const { data: trustScores } = useBatchTrustScores(reactionAuthors);
+  
+  // Calculate final scores
+  return useQuery({
+    queryKey: ['nostr', 'songsList', itemsQuery.data, trustScores?.size],
+    queryFn: async (): Promise<ScoredListItem[]> => {
+      if (!itemsQuery.data) return [];
+      
+      const { items, reactions } = itemsQuery.data;
+      
       const scoredItems = calculateScores(
-        visibleItems, 
-        reactions, 
-        trustMap || new Map(), 
+        items,
+        reactions,
+        trustScores || new Map(),
         user?.pubkey
       );
       
-      // Filter out negative scores and sort by score descending
       const result = scoredItems
         .filter(item => item.score >= 0)
         .sort((a, b) => b.score - a.score);
@@ -258,49 +277,69 @@ export function useSongsList() {
       console.log(`useSongsList: Returning ${result.length} scored items`);
       return result;
     },
-    staleTime: 60 * 1000, // 1 minute
+    enabled: !!itemsQuery.data,
+    staleTime: 60 * 1000,
   });
 }
 
 /**
  * Hook to fetch and score musicians from the master musicians list
+ * Uses on-demand trust score lookups (efficient)
  */
 export function useMusiciansList() {
-  const { data: trustMap } = useTrustMap();
   const { user } = useCurrentUser();
   const { hiddenIds } = useHiddenItems();
   
-  return useQuery({
-    queryKey: ['nostr', 'musiciansList', hiddenIds.length],
-    queryFn: async (): Promise<ScoredListItem[]> => {
+  // First, fetch items and reactions without trust scores
+  const itemsQuery = useQuery({
+    queryKey: ['nostr', 'musiciansListItems', hiddenIds.length],
+    queryFn: async () => {
       console.log('useMusiciansList: Fetching musicians...');
       
-      // Fetch list items
       const items = await fetchListItems(MUSICIANS_LIST_A_TAG);
       console.log(`useMusiciansList: Found ${items.length} items`);
       
-      if (items.length === 0) {
-        return [];
-      }
+      if (items.length === 0) return { items: [], reactions: new Map() };
       
-      // Filter out hidden items
       const visibleItems = items.filter(item => !hiddenIds.includes(item.id));
       console.log(`useMusiciansList: ${visibleItems.length} visible after filtering ${hiddenIds.length} hidden`);
       
-      // Fetch reactions for all items
       const itemIds = visibleItems.map(item => item.id);
       const reactions = await fetchReactions(itemIds);
       console.log(`useMusiciansList: Found reactions for ${reactions.size} items`);
       
-      // Calculate scores
+      return { items: visibleItems, reactions };
+    },
+    staleTime: 60 * 1000,
+  });
+  
+  // Get all unique reaction authors
+  const reactionAuthors = Array.from(
+    new Set(
+      Array.from(itemsQuery.data?.reactions.values() || [])
+        .flat()
+        .map(r => r.pubkey)
+    )
+  );
+  
+  // Batch fetch trust scores for all reaction authors
+  const { data: trustScores } = useBatchTrustScores(reactionAuthors);
+  
+  // Calculate final scores
+  return useQuery({
+    queryKey: ['nostr', 'musiciansList', itemsQuery.data, trustScores?.size],
+    queryFn: async (): Promise<ScoredListItem[]> => {
+      if (!itemsQuery.data) return [];
+      
+      const { items, reactions } = itemsQuery.data;
+      
       const scoredItems = calculateScores(
-        visibleItems, 
-        reactions, 
-        trustMap || new Map(), 
+        items,
+        reactions,
+        trustScores || new Map(),
         user?.pubkey
       );
       
-      // Filter out negative scores and sort by score descending
       const result = scoredItems
         .filter(item => item.score >= 0)
         .sort((a, b) => b.score - a.score);
@@ -308,7 +347,8 @@ export function useMusiciansList() {
       console.log(`useMusiciansList: Returning ${result.length} scored items`);
       return result;
     },
-    staleTime: 60 * 1000, // 1 minute
+    enabled: !!itemsQuery.data,
+    staleTime: 60 * 1000,
   });
 }
 
@@ -355,39 +395,56 @@ export function useGenreLists() {
 
 /**
  * Hook to fetch items from a specific genre sublist
+ * Uses on-demand trust score lookups (efficient)
  */
 export function useGenreListItems(listATag: string | undefined) {
-  const { data: trustMap } = useTrustMap();
   const { user } = useCurrentUser();
   
-  return useQuery({
-    queryKey: ['nostr', 'genreListItems', listATag],
-    queryFn: async (): Promise<ScoredListItem[]> => {
-      if (!listATag) return [];
+  const itemsQuery = useQuery({
+    queryKey: ['nostr', 'genreListItemsData', listATag],
+    queryFn: async () => {
+      if (!listATag) return { items: [], reactions: new Map() };
       
       console.log('useGenreListItems: Fetching items...');
       
-      // Fetch list items
       const items = await fetchListItems(listATag);
       console.log(`useGenreListItems: Found ${items.length} items`);
       
-      if (items.length === 0) {
-        return [];
-      }
+      if (items.length === 0) return { items: [], reactions: new Map() };
       
-      // Fetch reactions for all items
       const itemIds = items.map(item => item.id);
       const reactions = await fetchReactions(itemIds);
       
-      // Calculate scores
+      return { items, reactions };
+    },
+    enabled: !!listATag,
+    staleTime: 60 * 1000,
+  });
+  
+  const reactionAuthors = Array.from(
+    new Set(
+      Array.from(itemsQuery.data?.reactions.values() || [])
+        .flat()
+        .map(r => r.pubkey)
+    )
+  );
+  
+  const { data: trustScores } = useBatchTrustScores(reactionAuthors);
+  
+  return useQuery({
+    queryKey: ['nostr', 'genreListItems', listATag, itemsQuery.data, trustScores?.size],
+    queryFn: async (): Promise<ScoredListItem[]> => {
+      if (!itemsQuery.data) return [];
+      
+      const { items, reactions } = itemsQuery.data;
+      
       const scoredItems = calculateScores(
-        items, 
-        reactions, 
-        trustMap || new Map(), 
+        items,
+        reactions,
+        trustScores || new Map(),
         user?.pubkey
       );
       
-      // Filter out negative scores and sort by score descending
       const result = scoredItems
         .filter(item => item.score >= 0)
         .sort((a, b) => b.score - a.score);
@@ -395,7 +452,7 @@ export function useGenreListItems(listATag: string | undefined) {
       console.log(`useGenreListItems: Returning ${result.length} scored items`);
       return result;
     },
-    enabled: !!listATag,
-    staleTime: 60 * 1000, // 1 minute
+    enabled: !!itemsQuery.data && !!listATag,
+    staleTime: 60 * 1000,
   });
 }
