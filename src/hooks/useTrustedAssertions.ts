@@ -159,6 +159,7 @@ async function fetchTrustAssertions(
   let totalFetched = 0;
   let oldestTimestamp: number | undefined = undefined;
   let hasMore = true;
+  const seenEventIds = new Set<string>(); // Track seen events to detect duplicates
   
   console.log(`Fetching trust assertions from ${relayUrl}`);
   console.log(`Looking for kind ${KINDS.TRUSTED_ASSERTION_PUBKEY} by author ${providerPubkey}`);
@@ -176,7 +177,7 @@ async function fetchTrustAssertions(
       
       // Add until parameter for pagination (fetch older events)
       if (oldestTimestamp !== undefined) {
-        filter.until = oldestTimestamp;
+        filter.until = oldestTimestamp - 1; // -1 to avoid getting same timestamp again
       }
       
       console.log(`Query filter:`, JSON.stringify(filter));
@@ -186,20 +187,40 @@ async function fetchTrustAssertions(
       console.log(`Received ${events.length} events from relay`);
       
       if (events.length === 0) {
+        console.log('No more events, stopping pagination');
         hasMore = false;
         break;
       }
       
-      console.log(`Fetched ${events.length} assertions in this batch`);
-      totalFetched += events.length;
+      // Check for duplicates
+      const newEvents = events.filter(e => !seenEventIds.has(e.id));
+      const duplicates = events.length - newEvents.length;
+      
+      if (duplicates > 0) {
+        console.warn(`⚠️ Received ${duplicates} duplicate events - pagination is looping!`);
+      }
+      
+      if (newEvents.length === 0) {
+        console.log('All events in this batch were duplicates, stopping pagination');
+        hasMore = false;
+        break;
+      }
+      
+      totalFetched += newEvents.length;
       
       let parsedCount = 0;
       let skippedCount = 0;
       
-      for (const event of events) {
+      for (const event of newEvents) {
+        seenEventIds.add(event.id);
+        
         const assertion = parseTrustedAssertion(event);
         if (assertion) {
-          trustMap.set(assertion.pubkey, assertion.rank);
+          // Only update if this is newer than what we have
+          const existing = trustMap.get(assertion.pubkey);
+          if (!existing || event.created_at > (existing as any).created_at) {
+            trustMap.set(assertion.pubkey, assertion.rank);
+          }
           parsedCount++;
         } else {
           skippedCount++;
@@ -213,12 +234,13 @@ async function fetchTrustAssertions(
       
       console.log(`Parsed ${parsedCount} valid assertions, skipped ${skippedCount}`);
       
-      // If we got fewer events than the batch size, we've reached the end
-      if (events.length < BATCH_SIZE) {
+      // If we got fewer NEW events than the batch size, we've reached the end
+      if (newEvents.length < BATCH_SIZE) {
+        console.log('Received fewer events than batch size, likely at the end');
         hasMore = false;
       }
       
-      // Safety limit: stop after 200 batches (100k events)
+      // Safety limit: stop after fetching 100k UNIQUE events
       if (totalFetched >= 100000) {
         console.warn('Reached 100k event limit, stopping pagination');
         hasMore = false;
@@ -234,7 +256,15 @@ async function fetchTrustAssertions(
     const ranks = Array.from(trustMap.values());
     const above50 = ranks.filter(r => r > 50).length;
     const above10 = ranks.filter(r => r > 10).length;
-    console.log(`📈 Rank distribution: ${above50} pubkeys > 50, ${above10} pubkeys > 10`);
+    const above5 = ranks.filter(r => r > 5).length;
+    const above0 = ranks.filter(r => r > 0).length;
+    const maxRank = Math.max(...ranks, 0);
+    const minRank = Math.min(...ranks, 0);
+    const avgRank = ranks.reduce((sum, r) => sum + r, 0) / ranks.length;
+    
+    console.log(`📈 Rank distribution: ${above50} pubkeys > 50, ${above10} pubkeys > 10, ${above5} pubkeys > 5, ${above0} pubkeys > 0`);
+    console.log(`📊 Rank range: min=${minRank}, max=${maxRank}, avg=${avgRank.toFixed(2)}`);
+    console.log(`Sample ranks:`, ranks.slice(0, 20));
     
   } catch (error) {
     console.error('Failed to fetch trust assertions:', error);
