@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { Music, ChevronDown, ChevronUp, Plus, User, Loader2, Check, ExternalLink } from 'lucide-react';
+import { Music, ChevronDown, ChevronUp, Plus, User, Loader2, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/useToast';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { usePodcastIndexEpisodes } from '@/hooks/usePodcastIndex';
 import { useAddSong, useAddMusician } from '@/hooks/useCurator';
+import { useIsMusicianInList, useIsSongInList, useCheckMusicianExists, useCheckSongExists } from '@/hooks/useDuplicateCheck';
 import type { PodcastIndexFeed, PodcastIndexEpisode } from '@/lib/types';
 
 interface SearchResultCardProps {
@@ -14,6 +15,7 @@ interface SearchResultCardProps {
 
 export function SearchResultCard({ feed }: SearchResultCardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [checkingMusician, setCheckingMusician] = useState(false);
   const { user } = useCurrentUser();
   const { toast } = useToast();
   
@@ -24,8 +26,22 @@ export function SearchResultCard({ feed }: SearchResultCardProps) {
   const { mutate: addMusician, isPending: addingMusician } = useAddMusician();
   const { mutate: addSong, isPending: addingSong } = useAddSong();
   
+  // Local check: is this musician already in the loaded list?
+  const isInLocalList = useIsMusicianInList(feed.podcastGuid);
+  
+  // Relay check: trigger only when user clicks Add and it's not in local list
+  const { data: existsOnRelay, isLoading: checkingRelay } = useCheckMusicianExists(
+    feed.podcastGuid,
+    checkingMusician && !isInLocalList
+  );
+  
   const [addedMusician, setAddedMusician] = useState(false);
   const [addedSongs, setAddedSongs] = useState<Set<string>>(new Set());
+  const [checkingSongGuid, setCheckingSongGuid] = useState<string | null>(null);
+  
+  // Determine button state
+  const musicianAlreadyAdded = isInLocalList || existsOnRelay || addedMusician;
+  const isCheckingDuplicate = checkingRelay && checkingMusician;
   
   const handleAddMusician = () => {
     if (!user) {
@@ -37,26 +53,55 @@ export function SearchResultCard({ feed }: SearchResultCardProps) {
       return;
     }
     
-    addMusician({ feed, addSongsAutomatically: true }, {
-      onSuccess: (data) => {
-        setAddedMusician(true);
-        const songCount = data.songEvents.length;
+    // If already in local list, don't add
+    if (isInLocalList) {
+      toast({
+        title: 'Already Added',
+        description: `${feed.author || feed.title} is already in your list.`,
+      });
+      return;
+    }
+    
+    // Trigger relay check
+    setCheckingMusician(true);
+    
+    // Wait a moment for the query to run
+    setTimeout(() => {
+      // Check if relay returned duplicate
+      if (existsOnRelay) {
         toast({
-          title: 'Musician Added',
-          description: `${feed.author || feed.title} and ${songCount} songs have been added!`,
+          title: 'Already Added',
+          description: `${feed.author || feed.title} was already added by someone else.`,
         });
-      },
-      onError: (error) => {
-        toast({
-          title: 'Failed to Add',
-          description: error.message,
-          variant: 'destructive',
-        });
-      },
-    });
+        setCheckingMusician(false);
+        setAddedMusician(true); // Mark as added so button shows checkmark
+        return;
+      }
+      
+      // Not a duplicate, proceed with adding
+      addMusician({ feed, addSongsAutomatically: true }, {
+        onSuccess: (data) => {
+          setAddedMusician(true);
+          setCheckingMusician(false);
+          const songCount = data.songEvents.length;
+          toast({
+            title: 'Musician Added',
+            description: `${feed.author || feed.title} and ${songCount} songs have been added!`,
+          });
+        },
+        onError: (error) => {
+          setCheckingMusician(false);
+          toast({
+            title: 'Failed to Add',
+            description: error.message,
+            variant: 'destructive',
+          });
+        },
+      });
+    }, 500); // Wait 500ms for relay check to complete
   };
   
-  const handleAddSong = (episode: PodcastIndexEpisode) => {
+  const handleAddSong = async (episode: PodcastIndexEpisode) => {
     if (!user) {
       toast({
         title: 'Login Required',
@@ -66,22 +111,60 @@ export function SearchResultCard({ feed }: SearchResultCardProps) {
       return;
     }
     
-    addSong({ episode, feed }, {
-      onSuccess: () => {
-        setAddedSongs(prev => new Set([...prev, episode.guid]));
-        toast({
-          title: 'Song Added',
-          description: `${episode.title} has been added to the songs list.`,
+    // Check if already added to this session
+    if (addedSongs.has(episode.guid)) {
+      return;
+    }
+    
+    // Trigger relay check
+    setCheckingSongGuid(episode.guid);
+    
+    // Wait for relay check
+    setTimeout(async () => {
+      // Check relay for duplicate
+      const relay = new (await import('@nostrify/nostrify')).NRelay1((await import('@/lib/constants')).DCOSL_RELAY);
+      
+      try {
+        const existing = await relay.query([{
+          kinds: [9999, 39999],
+          '#z': [(await import('@/lib/constants')).SONGS_LIST_A_TAG],
+          '#t': [episode.guid],
+          limit: 1,
+        }]);
+        
+        if (existing.length > 0) {
+          toast({
+            title: 'Already Added',
+            description: `${episode.title} is already in the songs list.`,
+          });
+          setAddedSongs(prev => new Set([...prev, episode.guid]));
+          setCheckingSongGuid(null);
+          return;
+        }
+        
+        // Not a duplicate, add it
+        addSong({ episode, feed }, {
+          onSuccess: () => {
+            setAddedSongs(prev => new Set([...prev, episode.guid]));
+            setCheckingSongGuid(null);
+            toast({
+              title: 'Song Added',
+              description: `${episode.title} has been added to the songs list.`,
+            });
+          },
+          onError: (error) => {
+            setCheckingSongGuid(null);
+            toast({
+              title: 'Failed to Add',
+              description: error.message,
+              variant: 'destructive',
+            });
+          },
         });
-      },
-      onError: (error) => {
-        toast({
-          title: 'Failed to Add',
-          description: error.message,
-          variant: 'destructive',
-        });
-      },
-    });
+      } finally {
+        await relay.close();
+      }
+    }, 300);
   };
   
   return (
@@ -133,20 +216,20 @@ export function SearchResultCard({ feed }: SearchResultCardProps) {
         {/* Actions */}
         <div className="flex flex-col gap-2">
           <Button
-            variant={addedMusician ? 'outline' : 'default'}
+            variant={musicianAlreadyAdded ? 'outline' : 'default'}
             size="sm"
             onClick={handleAddMusician}
-            disabled={addingMusician || addedMusician || !user}
+            disabled={addingMusician || isCheckingDuplicate || musicianAlreadyAdded || !user}
             className="gap-1.5"
           >
-            {addingMusician ? (
+            {addingMusician || isCheckingDuplicate ? (
               <Loader2 className="w-4 h-4 animate-spin" />
-            ) : addedMusician ? (
+            ) : musicianAlreadyAdded ? (
               <Check className="w-4 h-4" />
             ) : (
               <User className="w-4 h-4" />
             )}
-            {addedMusician ? 'Added' : 'Add Artist'}
+            {isCheckingDuplicate ? 'Checking...' : musicianAlreadyAdded ? 'Added' : 'Add Artist'}
           </Button>
           
           <Button
@@ -213,10 +296,15 @@ export function SearchResultCard({ feed }: SearchResultCardProps) {
                     variant={addedSongs.has(episode.guid) ? 'outline' : 'default'}
                     size="sm"
                     onClick={() => handleAddSong(episode)}
-                    disabled={addingSong || addedSongs.has(episode.guid) || !user}
+                    disabled={addingSong || checkingSongGuid === episode.guid || addedSongs.has(episode.guid) || !user}
                     className="gap-1"
                   >
-                    {addedSongs.has(episode.guid) ? (
+                    {checkingSongGuid === episode.guid ? (
+                      <>
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                        Checking
+                      </>
+                    ) : addedSongs.has(episode.guid) ? (
                       <>
                         <Check className="w-3 h-3" />
                         Added
