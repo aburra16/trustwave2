@@ -4,6 +4,7 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { usePublishReaction } from '@/hooks/useReaction';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
+import { VotersList } from '@/components/songs/VotersList';
 import { KINDS } from '@/lib/constants';
 import type { ScoredListItem } from '@/lib/types';
 
@@ -125,16 +126,26 @@ export function MusicianCard({ musician, variant = 'default' }: MusicianCardProp
       
       {/* Actions */}
       <div className="p-3 flex items-center justify-between" onClick={(e) => e.preventDefault()}>
-        <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1 text-sm">
-            <ThumbsUp className="w-4 h-4 text-tw-success" />
-            <span>{musician.upvotes}</span>
-          </div>
-          {musician.downvotes > 0 && (
-            <div className="flex items-center gap-1 text-sm text-muted-foreground">
-              <ThumbsDown className="w-4 h-4" />
-              <span>{musician.downvotes}</span>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 text-sm">
+              <ThumbsUp className="w-4 h-4 text-tw-success" />
+              <span>{musician.upvotes}</span>
             </div>
+            {musician.downvotes > 0 && (
+              <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                <ThumbsDown className="w-4 h-4" />
+                <span>{musician.downvotes}</span>
+              </div>
+            )}
+          </div>
+          
+          {/* Who voted */}
+          {(musician.upvoterEvents || musician.downvoterEvents) && (
+            <VotersList 
+              upvoters={musician.upvoterEvents || []} 
+              downvoters={musician.downvoterEvents || []} 
+            />
           )}
         </div>
         
