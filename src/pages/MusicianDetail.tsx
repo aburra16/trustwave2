@@ -26,6 +26,11 @@ export default function MusicianDetail() {
   
   const artistEntries = allMusicians ? getArtistEntries(allMusicians, artistName) : [];
   
+  // Filter songs list to only show songs by this artist (define early)
+  const artistSongs = allSongs?.filter(song => 
+    (song.songArtist || '').toLowerCase() === artistName.toLowerCase()
+  ) || [];
+  
   // Use the primary entry (highest score) for metadata
   // If no musician entries, infer from songs
   const primaryMusician = artistEntries.sort((a, b) => b.score - a.score)[0] || (artistSongs[0] ? {
@@ -44,12 +49,8 @@ export default function MusicianDetail() {
     artistName,
     entriesFound: artistEntries.length,
     feedIds: artistEntries.map(e => e.feedId),
+    songsFound: artistSongs.length,
   });
-  
-  // Filter songs list to only show songs by this artist
-  const artistSongs = allSongs?.filter(song => 
-    (song.songArtist || '').toLowerCase() === artistName.toLowerCase()
-  ) || [];
   
   console.log(`Found ${artistSongs.length} songs in the songs list for artist "${artistName}"`);
   console.log('All songs count:', allSongs?.length);
