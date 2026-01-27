@@ -11,6 +11,7 @@ import {
   MUSICIANS_LIST_A_TAG,
   TRUST_THRESHOLD 
 } from '@/lib/constants';
+import { filterOutPodcasts } from '@/lib/filters';
 import type { ListItem, ScoredListItem } from '@/lib/types';
 
 /**
@@ -300,11 +301,16 @@ export function useSongsList() {
         user?.pubkey
       );
       
-      const result = scoredItems
-        .filter(item => item.score >= 0)
-        .sort((a, b) => b.score - a.score);
+      // Filter out negative scores
+      const positiveScored = scoredItems.filter(item => item.score >= 0);
       
-      console.log(`useSongsList: Returning ${result.length} scored items`);
+      // Filter out podcasts (keywords + duration check)
+      const musicOnly = filterOutPodcasts(positiveScored);
+      
+      // Sort by score descending
+      const result = musicOnly.sort((a, b) => b.score - a.score);
+      
+      console.log(`useSongsList: Returning ${result.length} music items (filtered out ${positiveScored.length - musicOnly.length} podcasts)`);
       return result;
     },
     enabled: !!itemsQuery.data,
