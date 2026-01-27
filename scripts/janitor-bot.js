@@ -76,20 +76,23 @@ function initKeys() {
 
 function loadCheckpoint() {
   if (!existsSync(CHECKPOINT_FILE)) {
-    return { downvotedSongs: new Set() };
+    return { downvotedSongs: new Set(), analyzedSongs: new Set() };
   }
   
   const data = JSON.parse(readFileSync(CHECKPOINT_FILE, 'utf-8'));
   return {
     downvotedSongs: new Set(data.downvotedSongs || []),
+    analyzedSongs: new Set(data.analyzedSongs || []),
   };
 }
 
-function saveCheckpoint(downvotedSongs) {
+function saveCheckpoint(downvotedSongs, analyzedSongs) {
   const data = {
     downvotedSongs: Array.from(downvotedSongs),
+    analyzedSongs: Array.from(analyzedSongs || []),
     lastUpdated: new Date().toISOString(),
     totalDownvoted: downvotedSongs.size,
+    totalAnalyzed: analyzedSongs?.size || 0,
   };
   writeFileSync(CHECKPOINT_FILE, JSON.stringify(data, null, 2));
 }
@@ -307,9 +310,9 @@ async function main() {
   // Fetch all songs
   const allSongs = await fetchAllSongs(ws);
   
-  // Filter out already downvoted
-  const toAnalyze = allSongs.filter(s => !checkpoint.downvotedSongs.has(s.id));
-  console.log(`🔍 Analyzing ${toAnalyze.length} songs (${checkpoint.downvotedSongs.size} already processed)\n`);
+  // Filter out already analyzed
+  const toAnalyze = allSongs.filter(s => !checkpoint.analyzedSongs.has(s.id));
+  console.log(`🔍 Analyzing ${toAnalyze.length} songs (${checkpoint.analyzedSongs.size} already analyzed)\n`);
   
   const failedSongs = [];
   const passedSongs = [];
@@ -329,7 +332,14 @@ async function main() {
     } else {
       passedSongs.push(song);
     }
+    
+    // Mark as analyzed
+    checkpoint.analyzedSongs.add(song.id);
   }
+  
+  // Save analysis checkpoint before publishing
+  saveCheckpoint(checkpoint.downvotedSongs, checkpoint.analyzedSongs);
+  console.log('💾 Analysis checkpoint saved\n');
   
   console.log('\n📊 Analysis Results:');
   console.log(`  ✅ Passed: ${passedSongs.length}`);
@@ -376,10 +386,8 @@ async function main() {
         checkpoint.downvotedSongs.add(item.song.id);
       });
       
-      // Save checkpoint every 10 batches
-      if ((i / BATCH_SIZE) % 10 === 0) {
-        saveCheckpoint(checkpoint.downvotedSongs);
-      }
+      // Save checkpoint every batch (important for recovery)
+      saveCheckpoint(checkpoint.downvotedSongs, checkpoint.analyzedSongs);
       
       await delay(BATCH_DELAY_MS);
     } catch (error) {
@@ -394,10 +402,11 @@ async function main() {
   
   console.log('\n✅ Janitor Bot Complete!');
   console.log(`📊 Total Downvoted: ${totalDownvoted}`);
-  console.log(`📊 Total Processed: ${checkpoint.downvotedSongs.size}`);
+  console.log(`📊 Total Analyzed: ${checkpoint.analyzedSongs.size}`);
+  console.log(`📊 Total Published: ${checkpoint.downvotedSongs.size}`);
   console.log(`📊 Clean Songs: ${passedSongs.length}`);
   
-  saveCheckpoint(checkpoint.downvotedSongs);
+  saveCheckpoint(checkpoint.downvotedSongs, checkpoint.analyzedSongs);
 }
 
 main().catch(error => {
