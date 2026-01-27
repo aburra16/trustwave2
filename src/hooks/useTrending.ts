@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { NRelay1 } from '@nostrify/nostrify';
 import { useBatchTrustScores } from './useTrustScore';
+import { useMusiciansList } from './useDecentralizedList';
 import { useCurrentUser } from './useCurrentUser';
 import { useHiddenItems } from './useHiddenItems';
 import { DCOSL_RELAY, KINDS, SONGS_LIST_A_TAG, MUSICIANS_LIST_A_TAG, TRUST_THRESHOLD } from '@/lib/constants';
@@ -194,55 +195,16 @@ export function useTrendingSongs() {
 }
 
 /**
- * Hook for trending artists with client-side pagination
- * Aggregates scores across all their songs
+ * Hook for trending artists
+ * Just uses the regular musicians list (already has WoT filtering and user's additions)
  */
 export function useTrendingArtists() {
-  const { user } = useCurrentUser();
-  const { hiddenIds } = useHiddenItems();
+  const { data: musicians, isLoading } = useMusiciansList();
   
-  const dataQuery = useQuery({
-    queryKey: ['trending', 'artists', 'data'],
-    queryFn: async () => {
-      console.log('Fetching trending artists...');
-      
-      const relay = new NRelay1(DCOSL_RELAY);
-      
-      try {
-        const items = await relay.query([{
-          kinds: [KINDS.LIST_ITEM, KINDS.LIST_ITEM_REPLACEABLE],
-          '#z': [MUSICIANS_LIST_A_TAG],
-          limit: 1000,
-        }]);
-        
-        const parsedItems = items.map(parseListItem).filter(item => !hiddenIds.includes(item.id));
-        const itemIds = parsedItems.map(i => i.id);
-        const reactions = await fetchReactionsForItems(itemIds);
-        
-        console.log(`Fetched ${parsedItems.length} musicians with reactions`);
-        
-        return { items: parsedItems, reactions };
-      } finally {
-        await relay.close();
-      }
-    },
-    staleTime: 2 * 60 * 1000,
-  });
-  
-  const allReactions = dataQuery.data ? Array.from(dataQuery.data.reactions.values()).flat() : [];
-  const reactionAuthors = Array.from(new Set(allReactions.map(r => r.pubkey)));
-  const { data: trustScores } = useBatchTrustScores(reactionAuthors);
-  
-  const scoredArtists = dataQuery.data && trustScores
-    ? calculateScores(dataQuery.data.items, dataQuery.data.reactions, trustScores, user?.pubkey)
-        .filter(item => item.score >= 0)
-        .sort((a, b) => b.score - a.score) // Sort by score descending
-    : [];
-  
-  console.log(`Returning ${scoredArtists.length} scored and sorted artists`);
+  console.log(`useTrendingArtists: ${musicians?.length || 0} musicians loaded`);
   
   return {
-    artists: scoredArtists,
-    isLoading: dataQuery.isLoading,
+    artists: musicians || [],
+    isLoading,
   };
 }
