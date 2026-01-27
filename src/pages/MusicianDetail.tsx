@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { SongCard } from '@/components/songs/SongCard';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useMusicianByGuid } from '@/hooks/useMusicianByGuid';
-import { useSongsByFeedId } from '@/hooks/useSongsByFeedId';
+import { usePodcastIndexEpisodes } from '@/hooks/usePodcastIndex';
 import { usePublishReaction } from '@/hooks/useReaction';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { cn } from '@/lib/utils';
@@ -24,9 +24,33 @@ export default function MusicianDetail() {
   
   const artistName = artistEntries[0]?.musicianName || artistEntries[0]?.name || 'Unknown Artist';
   const feedId = artistEntries[0]?.feedId;
+  const artistArtwork = artistEntries[0]?.musicianArtwork;
   
-  // Fetch songs for this artist's feedId (on-demand)
-  const { songs: artistSongs, isLoading: loadingSongs } = useSongsByFeedId(feedId);
+  // Fetch episodes from Podcast Index API (source of truth for artist's catalog)
+  const { data: episodes, isLoading: loadingEpisodes } = usePodcastIndexEpisodes(feedId);
+  
+  // Convert episodes to ScoredListItem format (unscored, just for playback)
+  const artistSongs: ScoredListItem[] = episodes?.map(ep => ({
+    id: `episode-${ep.guid}`,
+    pubkey: artistEntries[0]?.pubkey || '',
+    listATag: '',
+    songGuid: ep.guid,
+    songTitle: ep.title,
+    songArtist: artistName,
+    songUrl: ep.enclosureUrl,
+    songArtwork: ep.image || ep.feedImage || artistArtwork,
+    songDuration: ep.duration,
+    feedId: String(ep.feedId),
+    feedGuid: ep.podcastGuid,
+    createdAt: ep.datePublished,
+    event: {} as any,
+    score: 0,
+    upvotes: 0,
+    downvotes: 0,
+    userReaction: null,
+  })) || [];
+  
+  const loadingSongs = loadingEpisodes;
   
   // Use the primary entry (highest score) for metadata
   // If no musician entries, infer from songs
