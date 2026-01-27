@@ -37,13 +37,45 @@ export default function Search() {
   }, [searchQuery, allSongs]);
   
   const filteredMusicians = useMemo(() => {
-    if (!searchQuery.trim() || !groupedMusicians) return [];
+    if (!searchQuery.trim()) return [];
     
     const query = searchQuery.toLowerCase();
-    return groupedMusicians.filter(musician =>
+    
+    // Filter musicians by name
+    const matchingMusicians = groupedMusicians.filter(musician =>
       (musician.musicianName || musician.name || '').toLowerCase().includes(query)
     );
-  }, [searchQuery, groupedMusicians]);
+    
+    // Also check if any SONGS match this artist name (infer the artist exists)
+    const songsWithMatchingArtist = filteredSongs.filter(song =>
+      song.songArtist?.toLowerCase().includes(query)
+    );
+    
+    // Get unique artist names from matching songs
+    const artistsFromSongs = Array.from(
+      new Set(songsWithMatchingArtist.map(s => s.songArtist?.toLowerCase()))
+    ).filter(Boolean);
+    
+    // Create pseudo-musician entries for artists found in songs but not in musicians list
+    const inferredMusicians = artistsFromSongs
+      .filter(artistName => !matchingMusicians.some(m => 
+        (m.musicianName || m.name || '').toLowerCase() === artistName
+      ))
+      .map(artistName => {
+        // Find a song by this artist to get artwork
+        const sampleSong = songsWithMatchingArtist.find(s => s.songArtist?.toLowerCase() === artistName);
+        return {
+          id: `inferred-${artistName}`,
+          musicianName: sampleSong?.songArtist || '',
+          musicianArtwork: sampleSong?.songArtwork,
+          score: 0,
+          upvotes: 0,
+          downvotes: 0,
+        } as any;
+      });
+    
+    return [...matchingMusicians, ...inferredMusicians];
+  }, [searchQuery, groupedMusicians, filteredSongs]);
   
   const hasResults = filteredSongs.length > 0 || filteredMusicians.length > 0;
   const showResults = searchQuery.trim().length > 0;
