@@ -54,8 +54,8 @@ const IS_TEST = process.argv.includes('--test');
 const IS_DRY_RUN = process.argv.includes('--dry-run');
 const TEST_LIMIT = 50;
 
-const BATCH_SIZE = 100; // Downvotes per batch
-const BATCH_DELAY_MS = 500;
+const BATCH_SIZE = 50; // Downvotes per batch (reduced for relay stability)
+const BATCH_DELAY_MS = 2000; // 2 seconds between batches (relay-friendly)
 
 // Checkpoint
 const CHECKPOINT_FILE = './janitor-checkpoint.json';
@@ -264,7 +264,7 @@ async function publishBatch(events, ws) {
     setTimeout(() => {
       ws.off('message', messageHandler);
       reject(new Error('Batch timeout'));
-    }, 30000);
+    }, 60000); // 60 second timeout (relay needs time to process)
   });
 }
 
