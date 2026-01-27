@@ -151,6 +151,12 @@ async function main() {
   tables.forEach(t => console.log(`  - ${t.name}`));
   console.log('');
   
+  // Check if there's an episodes/items table
+  const hasEpisodes = tables.some(t => t.name.toLowerCase().includes('episode') || t.name.toLowerCase().includes('item'));
+  if (!hasEpisodes) {
+    console.warn('⚠️  No episodes table found - will only import musicians, not individual songs');
+  }
+  
   // Check the schema of the podcasts table
   console.log('📋 Podcasts table columns:');
   const columns = db.prepare(`PRAGMA table_info(podcasts)`).all();
@@ -158,10 +164,18 @@ async function main() {
   console.log('');
   
   // Get count of music feeds
+  // Filter by itunesType = 'episodic' and categories containing 'music'
   const musicFeedsCount = db.prepare(`
     SELECT COUNT(*) as count 
     FROM podcasts 
-    WHERE medium = 'music'
+    WHERE itunesType = 'episodic'
+      AND (
+        category1 LIKE '%music%' OR 
+        category2 LIKE '%music%' OR 
+        category3 LIKE '%music%' OR
+        category4 LIKE '%music%' OR
+        category5 LIKE '%music%'
+      )
   `).get();
   
   console.log(`📊 Found ${musicFeedsCount.count} music feeds in database\n`);
@@ -179,9 +193,16 @@ async function main() {
   
   // Query music feeds
   const feeds = db.prepare(`
-    SELECT id, podcastGuid, title, author, url, artwork, image
+    SELECT id, podcastGuid, title, itunesAuthor as author, url, imageUrl as artwork
     FROM podcasts 
-    WHERE medium = 'music'
+    WHERE itunesType = 'episodic'
+      AND (
+        category1 LIKE '%music%' OR 
+        category2 LIKE '%music%' OR 
+        category3 LIKE '%music%' OR
+        category4 LIKE '%music%' OR
+        category5 LIKE '%music%'
+      )
     LIMIT 100
   `).all(); // Start with 100 for testing
   
