@@ -21,10 +21,18 @@ export default function MusicianDetail() {
   const artistName = decodeURIComponent(artistSlug || '').replace(/-/g, ' ');
   
 // Get ALL musician entries for this artist (could be multiple albums/feeds)
+  // First check the loaded musicians list
   const { data: allMusicians, isLoading: loadingMusicians } = useMusiciansList();
   const { data: allSongs, isLoading: loadingSongs } = useSongsList();
   
-  const artistEntries = allMusicians ? getArtistEntries(allMusicians, artistName) : [];
+  let artistEntries = allMusicians ? getArtistEntries(allMusicians, artistName) : [];
+  
+  // If not found in loaded list, this artist might not be in the top 1000
+  // Try querying the relay directly by name
+  const needsDirectQuery = !loadingMusicians && artistEntries.length === 0;
+  
+  // TODO: Add a direct relay query for this specific artist by name
+  // For now, we'll infer from songs (current behavior)
   
   // Filter songs list to only show songs by this artist (define early)
   const artistSongs = allSongs?.filter(song => 

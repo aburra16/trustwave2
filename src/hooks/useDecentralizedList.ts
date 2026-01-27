@@ -73,6 +73,8 @@ async function fetchListItems(listATag: string, limit = 500): Promise<ListItem[]
       kinds: [KINDS.LIST_ITEM, KINDS.LIST_ITEM_REPLACEABLE],
       '#z': [listATag],
       limit, // Configurable limit
+      // Note: Nostr relays return events in reverse chronological order by default
+      // This means newest events come first (your manually-added ones before bulk import)
     };
     console.log('Query filter:', JSON.stringify(filter));
     
@@ -299,11 +301,35 @@ export function useMusiciansList() {
   
   // First, fetch items and reactions without trust scores
   const itemsQuery = useQuery({
-    queryKey: ['nostr', 'musiciansListItems', hiddenIds.length],
+    queryKey: ['nostr', 'musiciansListItems', hiddenIds.length, user?.pubkey],
     queryFn: async () => {
       console.log('useMusiciansList: Fetching musicians...');
       
-      const items = await fetchListItems(MUSICIANS_LIST_A_TAG, 1000); // Limit to 1000 for performance
+      // Fetch recent musicians (will get manually-added ones first)
+      let items = await fetchListItems(MUSICIANS_LIST_A_TAG, 1000);
+      
+      // If user is logged in, also fetch THEIR musicians specifically
+      // This ensures users always see musicians they added
+      if (user?.pubkey) {
+        const relay = new NRelay1(DCOSL_RELAY);
+        try {
+          const userMusicians = await relay.query([{
+            kinds: [KINDS.LIST_ITEM, KINDS.LIST_ITEM_REPLACEABLE],
+            '#z': [MUSICIANS_LIST_A_TAG],
+            authors: [user.pubkey],
+            limit: 500,
+          }]);
+          
+          // Merge user's musicians with the general list (dedupe by ID)
+          const existingIds = new Set(items.map(e => e.id));
+          const newUserMusicians = userMusicians.filter(e => !existingIds.has(e.id));
+          items = [...newUserMusicians.map(parseListItem), ...items.slice(0, 900)]; // Keep total ~1000
+          
+          console.log(`Added ${newUserMusicians.length} of user's musicians to the list`);
+        } finally {
+          await relay.close();
+        }
+      }
       console.log(`useMusiciansList: Found ${items.length} items`);
       
       if (items.length === 0) return { items: [], reactions: new Map() };
