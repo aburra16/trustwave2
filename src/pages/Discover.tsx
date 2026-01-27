@@ -51,15 +51,15 @@ export default function Discover() {
           
           <div className="flex flex-wrap justify-center gap-4">
             <Button size="lg" asChild>
-              <Link to="/songs">
+              <Link to="/browse">
                 <Music className="w-5 h-5 mr-2" />
-                Explore Songs
+                Browse Playlists
               </Link>
             </Button>
             <Button size="lg" variant="outline" asChild>
               <Link to="/search">
                 <Sparkles className="w-5 h-5 mr-2" />
-                Add Music
+                Search Catalog
               </Link>
             </Button>
           </div>

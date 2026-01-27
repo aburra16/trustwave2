@@ -2,10 +2,10 @@ import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { ScrollToTop } from "./components/ScrollToTop";
 
 import Discover from "./pages/Discover";
-import Songs from "./pages/Songs";
-import Musicians from "./pages/Musicians";
-import MusicianDetail from "./pages/MusicianDetail";
+import Browse from "./pages/Browse";
 import Search from "./pages/Search";
+import AddMusic from "./pages/AddMusic";
+import MusicianDetail from "./pages/MusicianDetail";
 import Curate from "./pages/Curate";
 import Manage from "./pages/Manage";
 import Settings from "./pages/Settings";
@@ -18,10 +18,10 @@ export function AppRouter() {
       <ScrollToTop />
       <Routes>
         <Route path="/" element={<Discover />} />
-        <Route path="/songs" element={<Songs />} />
-        <Route path="/musicians" element={<Musicians />} />
-        <Route path="/musician/:artistSlug" element={<MusicianDetail />} />
+        <Route path="/browse" element={<Browse />} />
         <Route path="/search" element={<Search />} />
+        <Route path="/add-music" element={<AddMusic />} />
+        <Route path="/musician/:artistSlug" element={<MusicianDetail />} />
         <Route path="/curate" element={<Curate />} />
         <Route path="/manage" element={<Manage />} />
         <Route path="/settings" element={<Settings />} />

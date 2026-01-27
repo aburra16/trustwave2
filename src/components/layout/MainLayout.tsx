@@ -1,6 +1,6 @@
 import { ReactNode } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Music, Users, Search, Radio, Plus, Settings, ListChecks } from 'lucide-react';
+import { Search, Radio, Plus, Settings, ListChecks, ListMusic } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { LoginArea } from '@/components/auth/LoginArea';
 import { PersonalizeButton } from '@/components/PersonalizeButton';
@@ -14,11 +14,10 @@ interface MainLayoutProps {
 
 const navItems = [
   { path: '/', label: 'Discover', icon: Radio },
-  { path: '/songs', label: 'Songs', icon: Music },
-  { path: '/musicians', label: 'Musicians', icon: Users },
+  { path: '/browse', label: 'Browse', icon: ListMusic },
   { path: '/search', label: 'Search', icon: Search },
-  { path: '/curate', label: 'Curate', icon: Plus },
-  { path: '/manage', label: 'Manage', icon: ListChecks },
+  { path: '/add-music', label: 'Add', icon: Plus },
+  { path: '/curate', label: 'Curate', icon: ListChecks },
 ];
 
 export function MainLayout({ children }: MainLayoutProps) {
