@@ -6,7 +6,8 @@ import { Button } from '@/components/ui/button';
 import { SongCard } from '@/components/songs/SongCard';
 import { MusicianCard } from '@/components/musicians/MusicianCard';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useSongsList, useMusiciansList } from '@/hooks/useDecentralizedList';
+import { useMusiciansList } from '@/hooks/useDecentralizedList';
+import { useTrendingSongs } from '@/hooks/useTrending';
 import { useListCounts } from '@/hooks/useListCounts';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { APP_NAME, APP_TAGLINE, APP_DESCRIPTION } from '@/lib/constants';
@@ -19,10 +20,11 @@ export default function Discover() {
   });
   
   const { user } = useCurrentUser();
-  const { data: songs, isLoading: loadingSongs } = useSongsList();
+  const { songs, isLoading: loadingSongs } = useTrendingSongs();
   const { data: musicians, isLoading: loadingMusicians } = useMusiciansList();
   const { data: counts } = useListCounts(); // Simple counts without scoring
   
+  // Top 6 trending songs (already sorted by WoT score)
   const topSongs = songs?.slice(0, 6) || [];
   const topMusicians = musicians?.slice(0, 5) || [];
   
