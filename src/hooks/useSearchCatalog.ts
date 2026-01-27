@@ -1,12 +1,12 @@
 import { useQuery } from '@tanstack/react-query';
-import { NRelay1 } from '@nostrify/nostrify';
+import { NRelay1, type NostrEvent } from '@nostrify/nostrify';
 import { useBatchTrustScores } from './useTrustScore';
 import { useCurrentUser } from './useCurrentUser';
 import { useHiddenItems } from './useHiddenItems';
 import { DCOSL_RELAY, KINDS, SONGS_LIST_A_TAG, MUSICIANS_LIST_A_TAG, TRUST_THRESHOLD, SYSTEM_CURATORS } from '@/lib/constants';
 import { filterOutPodcasts } from '@/lib/filters';
 import { groupMusiciansByArtist } from '@/lib/musicianUtils';
-import type { ListItem, ScoredListItem, NostrEvent } from '@/lib/types';
+import type { ListItem, ScoredListItem } from '@/lib/types';
 
 function parseListItem(event: NostrEvent): ListItem {
   const tags = event.tags;
