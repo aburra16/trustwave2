@@ -86,7 +86,15 @@ export function useBatchTrustScores(pubkeys: string[]) {
   return useQuery({
     queryKey: ['batchTrustScores', pubkeys.join(','), serviceProviderPubkey],
     queryFn: async (): Promise<Map<string, number>> => {
-      if (pubkeys.length === 0) return new Map();
+      console.log('=== useBatchTrustScores START ===');
+      console.log('Pubkeys to fetch:', pubkeys.length, pubkeys);
+      console.log('Service provider:', serviceProviderPubkey);
+      console.log('Service relay:', serviceRelay);
+      
+      if (pubkeys.length === 0) {
+        console.log('No pubkeys to fetch');
+        return new Map();
+      }
       
       const trustScores = new Map<string, number>();
       
@@ -97,6 +105,7 @@ export function useBatchTrustScores(pubkeys: string[]) {
         if (user?.pubkey) {
           trustScores.set(user.pubkey, 100); // User always trusts themselves
         }
+        console.log('=== useBatchTrustScores END (no provider) ===');
         return trustScores;
       }
       
@@ -150,6 +159,7 @@ export function useBatchTrustScores(pubkeys: string[]) {
       const ranks = Array.from(trustScores.values());
       const above50 = ranks.filter(r => r > 50).length;
       console.log(`${above50} pubkeys with rank > 50`);
+      console.log('=== useBatchTrustScores END ===');
       
       await relay.close();
       return trustScores;

@@ -180,8 +180,16 @@ export function useTrendingSongs() {
   
   const { data: trustScores, isLoading: loadingScores } = useBatchTrustScores(reactionAuthors);
   
-  // Wait for both data and trust scores
-  const scoredSongs = dataQuery.data && trustScores
+  console.log('useTrendingSongs state:', {
+    hasData: !!dataQuery.data,
+    hasTrustScores: !!trustScores,
+    trustScoresSize: trustScores?.size || 0,
+    loadingData: dataQuery.isLoading,
+    loadingScores,
+  });
+  
+  // Calculate scores only when BOTH data and trust scores are ready
+  const scoredSongs = dataQuery.data && trustScores && !loadingScores
     ? calculateScores(dataQuery.data.items, dataQuery.data.reactions, trustScores, user?.pubkey)
         .filter(item => item.score >= 0)
         .sort((a, b) => b.score - a.score) // Sort by score descending
