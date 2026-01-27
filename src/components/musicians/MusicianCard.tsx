@@ -39,14 +39,13 @@ export function MusicianCard({ musician, variant = 'default' }: MusicianCardProp
   const name = musician.musicianName || musician.name || 'Unknown Artist';
   const artwork = musician.musicianArtwork || musician.songArtwork;
   
-  // Use artist name for navigation (URL-encoded)
-  // This allows grouping all feeds/albums by the same artist
-  const musicianSlug = encodeURIComponent(name.toLowerCase().replace(/\s+/g, '-'));
+  // Use GUID for navigation (deep linkable)
+  const musicianGuid = musician.musicianFeedGuid || musician.feedGuid;
   
   if (variant === 'compact') {
     return (
       <Link 
-        to={`/musician/${musicianSlug}`}
+        to={musicianGuid ? `/musician/${musicianGuid}` : '#'}
         className="group flex items-center gap-3 p-2 rounded-lg hover:bg-secondary/50 transition-all block"
       >
         {/* Avatar */}
@@ -80,7 +79,7 @@ export function MusicianCard({ musician, variant = 'default' }: MusicianCardProp
   
   return (
     <Link 
-      to={`/musician/${musicianSlug}`}
+      to={musicianGuid ? `/musician/${musicianGuid}` : '#'}
       className={cn(
         'group relative rounded-xl overflow-hidden bg-card border border-border/50 transition-all duration-200 block',
         'hover:border-primary/30 hover:shadow-lg hover:shadow-primary/5 cursor-pointer'

@@ -25,7 +25,7 @@ export function AppRouter() {
         <Route path="/add-music" element={<AddMusic />} />
         <Route path="/trending/songs" element={<TrendingSongs />} />
         <Route path="/trending/artists" element={<TrendingArtists />} />
-        <Route path="/musician/:artistSlug" element={<MusicianDetail />} />
+        <Route path="/musician/:guid" element={<MusicianDetail />} />
         <Route path="/curate" element={<Curate />} />
         <Route path="/manage" element={<Manage />} />
         <Route path="/settings" element={<Settings />} />
