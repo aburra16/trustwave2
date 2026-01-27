@@ -191,9 +191,10 @@ async function main() {
   
   console.log('✅ Connected to relay\n');
   
-  // Query music feeds (all of them - no limit)
+  // Query music feeds with smart filtering to reduce junk/spam
   const feeds = db.prepare(`
-    SELECT id, podcastGuid, title, itunesAuthor as author, url, imageUrl as artwork
+    SELECT id, podcastGuid, title, itunesAuthor as author, url, imageUrl as artwork,
+           popularityScore, episodeCount, dead, newestEnclosureDuration
     FROM podcasts 
     WHERE itunesType = 'episodic'
       AND (
@@ -205,7 +206,13 @@ async function main() {
       )
       AND podcastGuid IS NOT NULL
       AND podcastGuid != ''
-  `).all(); // Full import - all ~248k feeds
+      AND dead = 0
+      AND episodeCount >= 3
+      AND popularityScore > 0
+      AND newestEnclosureDuration > 0
+      AND newestEnclosureDuration < 1800
+    ORDER BY popularityScore DESC
+  `).all(); // Full import - filtered ~248k feeds, best quality first
   
   console.log(`🎸 Processing ${feeds.length} music feeds...\n`);
   

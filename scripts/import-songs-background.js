@@ -37,7 +37,7 @@ const TEST_LIMIT = 10; // Process 10 artists in test mode
 
 // Resume mode
 const IS_RESUME = process.argv.includes('--resume');
-const CHECKPOINT_FILE = './songs-import-checkpoint.json';
+const CHECKPOINT_FILE = process.env.CHECKPOINT_PATH || './songs-import-checkpoint.json';
 
 // ============================================================================
 // HELPERS
@@ -138,39 +138,79 @@ async function publishBatch(events, ws) {
 }
 
 async function fetchMusicians(ws) {
-  return new Promise((resolve) => {
-    const musicians = [];
-    const reqId = 'fetch-musicians-' + Date.now();
+  console.log('📡 Fetching musicians from relay (may take multiple batches)...');
+  const musicians = [];
+  const RELAY_LIMIT = 10000;
+  let oldestTimestamp = undefined;
+  let batchCount = 0;
+  
+  while (true) {
+    batchCount++;
+    const reqId = `fetch-musicians-${Date.now()}`;
     
-    const messageHandler = (data) => {
-      try {
-        const msg = JSON.parse(data.toString());
-        if (msg[0] === 'EVENT' && msg[1] === reqId) {
-          const event = msg[2];
-          const feedId = event.tags.find(t => t[0] === 'feedId')?.[1];
-          const feedGuid = event.tags.find(t => t[0] === 'feedGuid')?.[1];
-          const name = event.tags.find(t => t[0] === 'name')?.[1];
-          const artwork = event.tags.find(t => t[0] === 'artwork')?.[1];
-          
-          if (feedId && feedGuid) {
-            musicians.push({ id: event.id, feedId, feedGuid, name, artwork });
+    const batch = await new Promise((resolve) => {
+      const batchMusicians = [];
+      
+      const messageHandler = (data) => {
+        try {
+          const msg = JSON.parse(data.toString());
+          if (msg[0] === 'EVENT' && msg[1] === reqId) {
+            const event = msg[2];
+            const feedId = event.tags.find(t => t[0] === 'feedId')?.[1];
+            const feedGuid = event.tags.find(t => t[0] === 'feedGuid')?.[1];
+            const name = event.tags.find(t => t[0] === 'name')?.[1];
+            const artwork = event.tags.find(t => t[0] === 'artwork')?.[1];
+            
+            if (feedId && feedGuid) {
+              batchMusicians.push({ id: event.id, feedId, feedGuid, name, artwork, createdAt: event.created_at });
+            }
+          } else if (msg[0] === 'EOSE' && msg[1] === reqId) {
+            ws.off('message', messageHandler);
+            resolve(batchMusicians);
           }
-        } else if (msg[0] === 'EOSE' && msg[1] === reqId) {
-          ws.off('message', messageHandler);
-          resolve(musicians);
-        }
-      } catch (e) {}
-    };
+        } catch (e) {}
+      };
+      
+      ws.on('message', messageHandler);
+      
+      const filter = {
+        kinds: [9999, 39999],
+        '#z': ['39998:b83a28b7e4e5d20bd960c5faeb6625f95529166b8bdb045d42634a2f35919450:8623051e-1736-437d-92b1-9049b86def30'],
+        limit: IS_TEST ? TEST_LIMIT : RELAY_LIMIT,
+      };
+      
+      if (oldestTimestamp !== undefined) {
+        filter.until = oldestTimestamp - 1;
+      }
+      
+      console.log(`  Fetching batch ${batchCount} (until: ${oldestTimestamp || 'none'})...`);
+      ws.send(JSON.stringify(['REQ', reqId, filter]));
+    });
     
-    ws.on('message', messageHandler);
+    console.log(`  Received ${batch.length} musicians in batch ${batchCount}`);
     
-    // Request all musicians
-    ws.send(JSON.stringify(['REQ', reqId, {
-      kinds: [9999, 39999],
-      '#z': ['39998:b83a28b7e4e5d20bd960c5faeb6625f95529166b8bdb045d42634a2f35919450:8623051e-1736-437d-92b1-9049b86def30'],
-      limit: IS_TEST ? TEST_LIMIT : 100000,
-    }]));
-  });
+    if (batch.length === 0) {
+      console.log('  No more musicians to fetch\n');
+      break;
+    }
+    
+    musicians.push(...batch);
+    
+    // Update oldest timestamp for pagination
+    const oldest = batch.reduce((min, m) => Math.min(min, m.createdAt), Infinity);
+    oldestTimestamp = oldest;
+    
+    // If we got less than relay limit, we've reached the end
+    if (batch.length < RELAY_LIMIT) {
+      console.log('  Reached end of musicians list\n');
+      break;
+    }
+    
+    // In test mode, only do one batch
+    if (IS_TEST) break;
+  }
+  
+  return musicians;
 }
 
 async function fetchEpisodesFromAPI(feedId) {
