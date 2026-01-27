@@ -125,7 +125,7 @@ export default function Discover() {
             Trending Songs
           </h2>
           <Button variant="ghost" asChild>
-            <Link to="/songs">
+            <Link to="/trending/songs">
               View All <ArrowRight className="w-4 h-4 ml-1" />
             </Link>
           </Button>
@@ -171,10 +171,10 @@ export default function Discover() {
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-2xl font-bold flex items-center gap-2">
             <Users className="w-6 h-6 text-primary" />
-            Featured Artists
+            Trending Artists
           </h2>
           <Button variant="ghost" asChild>
-            <Link to="/musicians">
+            <Link to="/trending/artists">
               View All <ArrowRight className="w-4 h-4 ml-1" />
             </Link>
           </Button>

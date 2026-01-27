@@ -5,6 +5,8 @@ import Discover from "./pages/Discover";
 import Browse from "./pages/Browse";
 import Search from "./pages/Search";
 import AddMusic from "./pages/AddMusic";
+import TrendingSongs from "./pages/TrendingSongs";
+import TrendingArtists from "./pages/TrendingArtists";
 import MusicianDetail from "./pages/MusicianDetail";
 import Curate from "./pages/Curate";
 import Manage from "./pages/Manage";
@@ -21,6 +23,8 @@ export function AppRouter() {
         <Route path="/browse" element={<Browse />} />
         <Route path="/search" element={<Search />} />
         <Route path="/add-music" element={<AddMusic />} />
+        <Route path="/trending/songs" element={<TrendingSongs />} />
+        <Route path="/trending/artists" element={<TrendingArtists />} />
         <Route path="/musician/:artistSlug" element={<MusicianDetail />} />
         <Route path="/curate" element={<Curate />} />
         <Route path="/manage" element={<Manage />} />
