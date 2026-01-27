@@ -44,7 +44,7 @@ export default function MusicianDetail() {
   const userReaction = artistEntries.find(e => e.userReaction)?.userReaction || null;
   
   console.log('MusicianDetail:', { 
-    artistSlug,
+    guid,
     artistName,
     entriesFound: artistEntries.length,
     feedIds: artistEntries.map(e => e.feedId),
