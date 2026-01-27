@@ -102,45 +102,57 @@ export function useBatchTrustScores(pubkeys: string[]) {
       
       console.log(`Batch fetching trust scores for ${pubkeys.length} pubkeys from ${serviceRelay}`);
       
-      const relay = new NRelay1(serviceRelay);
+      let relay = new NRelay1(serviceRelay);
+      let events = [];
       
       try {
-        // Fetch all in one query using #d filter
-        const events = await relay.query([{
+        // Try the service relay first
+        events = await relay.query([{
           kinds: [KINDS.TRUSTED_ASSERTION_PUBKEY],
           authors: [serviceProviderPubkey],
           '#d': pubkeys,
           limit: pubkeys.length,
         }]);
-        
-        console.log(`Received ${events.length} trust assertion events for ${pubkeys.length} pubkeys`);
-        
-        for (const event of events) {
-          const dTag = event.tags.find(([name]) => name === 'd')?.[1];
-          const rankTag = event.tags.find(([name]) => name === 'rank')?.[1];
-          
-          if (dTag && rankTag) {
-            const rank = parseInt(rankTag, 10);
-            trustScores.set(dTag, rank);
-          }
-        }
-        
-        // User always trusts themselves (rank 100)
-        if (user?.pubkey) {
-          trustScores.set(user.pubkey, 100);
-        }
-        
-        console.log(`Parsed ${trustScores.size} trust scores (including self)`);
-        
-        // Log some stats
-        const ranks = Array.from(trustScores.values());
-        const above50 = ranks.filter(r => r > 50).length;
-        console.log(`${above50} pubkeys with rank > 50`);
-        
-        return trustScores;
-      } finally {
+      } catch (error) {
+        console.warn(`Failed to fetch from ${serviceRelay}, trying fallback...`);
         await relay.close();
+        
+        // Fallback to nip85.brainstorm.world if service relay fails
+        relay = new NRelay1('wss://nip85.brainstorm.world');
+        events = await relay.query([{
+          kinds: [KINDS.TRUSTED_ASSERTION_PUBKEY],
+          authors: [serviceProviderPubkey],
+          '#d': pubkeys,
+          limit: pubkeys.length,
+        }]);
       }
+      
+      console.log(`Received ${events.length} trust assertion events for ${pubkeys.length} pubkeys`);
+      
+      for (const event of events) {
+        const dTag = event.tags.find(([name]) => name === 'd')?.[1];
+        const rankTag = event.tags.find(([name]) => name === 'rank')?.[1];
+        
+        if (dTag && rankTag) {
+          const rank = parseInt(rankTag, 10);
+          trustScores.set(dTag, rank);
+        }
+      }
+      
+      // User always trusts themselves (rank 100)
+      if (user?.pubkey) {
+        trustScores.set(user.pubkey, 100);
+      }
+      
+      console.log(`Parsed ${trustScores.size} trust scores (including self)`);
+      
+      // Log some stats
+      const ranks = Array.from(trustScores.values());
+      const above50 = ranks.filter(r => r > 50).length;
+      console.log(`${above50} pubkeys with rank > 50`);
+      
+      await relay.close();
+      return trustScores;
     },
     enabled: pubkeys.length > 0,
     staleTime: Infinity, // Cache forever for the session
