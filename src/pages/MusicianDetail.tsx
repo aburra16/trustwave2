@@ -68,11 +68,17 @@ export default function MusicianDetail() {
   const handleReaction = (reaction: '+' | '-') => {
     if (!user || !primaryMusician) return;
     
+    // Can't vote on inferred musicians (they don't have a real Nostr event)
+    if (primaryMusician.id.startsWith('inferred-')) {
+      console.log('Cannot vote on inferred musician - no musician event exists');
+      return;
+    }
+    
     // React to the primary entry (highest scored)
     publishReaction({
       targetEventId: primaryMusician.id,
-      targetPubkey: primaryMusician.pubkey,
-      targetKind: primaryMusician.event.kind || KINDS.LIST_ITEM,
+      targetPubkey: primaryMusician.pubkey || '',
+      targetKind: primaryMusician.event?.kind || KINDS.LIST_ITEM,
       reaction,
       currentReaction: userReaction,
     });
@@ -183,8 +189,8 @@ export default function MusicianDetail() {
                   )}
                 </div>
                 
-                {/* Actions */}
-                {user && primaryMusician && (
+                {/* Actions - only show if this is a real musician entry */}
+                {user && primaryMusician && !primaryMusician.id.startsWith('inferred-') && (
                   <>
                     <Button
                       variant="outline"
