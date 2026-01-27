@@ -207,7 +207,6 @@ async function main() {
       AND podcastGuid IS NOT NULL
       AND podcastGuid != ''
       AND dead = 0
-      AND episodeCount >= 3
       AND popularityScore > 0
       AND newestEnclosureDuration > 0
       AND newestEnclosureDuration < 1800
