@@ -22,8 +22,8 @@ import { WebSocket } from 'ws';
 const NSEC = 'nsec1xfm674c09pp0sttes9k0hpmy80mpku05p707thhfw3puncfgum5s3nlznh'; // TrustWave Indexer nsec
 const DB_PATH = '/Users/avinashburra/downloads/podcastindex/podcastindex.db'; // Path to your SQLite DB file
 const RELAY_URL = 'wss://dcosl.brainstorm.world';
-const BATCH_SIZE = 500; // Events per batch (match relay maxFilterLimit)
-const BATCH_DELAY_MS = 2000; // Delay between batches (2 seconds)
+const BATCH_SIZE = 1000; // Events per batch (relay now supports 10k limit)
+const BATCH_DELAY_MS = 1000; // Delay between batches (1 second)
 
 // Master list a-tags
 const SONGS_LIST_A_TAG = '39998:b83a28b7e4e5d20bd960c5faeb6625f95529166b8bdb045d42634a2f35919450:17c49d8b-c0d9-49bf-875f-6c7568f45f38';
@@ -191,7 +191,7 @@ async function main() {
   
   console.log('✅ Connected to relay\n');
   
-  // Query music feeds
+  // Query music feeds (all of them - no limit)
   const feeds = db.prepare(`
     SELECT id, podcastGuid, title, itunesAuthor as author, url, imageUrl as artwork
     FROM podcasts 
@@ -203,8 +203,9 @@ async function main() {
         category4 LIKE '%music%' OR
         category5 LIKE '%music%'
       )
-    LIMIT 100
-  `).all(); // Start with 100 for testing
+      AND podcastGuid IS NOT NULL
+      AND podcastGuid != ''
+  `).all(); // Full import - all ~248k feeds
   
   console.log(`🎸 Processing ${feeds.length} music feeds...\n`);
   
