@@ -9,7 +9,8 @@ import {
   KINDS, 
   SONGS_LIST_A_TAG, 
   MUSICIANS_LIST_A_TAG,
-  TRUST_THRESHOLD 
+  TRUST_THRESHOLD,
+  SYSTEM_CURATORS 
 } from '@/lib/constants';
 import { filterOutPodcasts } from '@/lib/filters';
 import type { ListItem, ScoredListItem } from '@/lib/types';
@@ -178,7 +179,12 @@ function calculateScores(
     // Now count the latest reaction from each user
     for (const reaction of reactionsByAuthor.values()) {
       totalReactions++;
-      const authorRank = trustScores.get(reaction.pubkey) || 0;
+      
+      // Check trust score (from WoT) OR system curators (always trusted)
+      const authorRank = trustScores.get(reaction.pubkey) 
+        || SYSTEM_CURATORS[reaction.pubkey] 
+        || 0;
+      
       const isTrusted = authorRank > TRUST_THRESHOLD;
       const isCurrentUser = reaction.pubkey === userPubkey;
       
