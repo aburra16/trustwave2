@@ -5,8 +5,8 @@ import { MainLayout } from '@/components/layout/MainLayout';
 import { Button } from '@/components/ui/button';
 import { SongCard } from '@/components/songs/SongCard';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useSongsList } from '@/hooks/useDecentralizedList';
 import { useMusicianByGuid } from '@/hooks/useMusicianByGuid';
+import { useSongsByFeedId } from '@/hooks/useSongsByFeedId';
 import { usePublishReaction } from '@/hooks/useReaction';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { cn } from '@/lib/utils';
@@ -21,14 +21,12 @@ export default function MusicianDetail() {
   
   // Fetch musician(s) by GUID (on-demand, works even if not in loaded list)
   const { musicians: artistEntries, isLoading: loadingMusicians } = useMusicianByGuid(guid);
-  const { data: allSongs, isLoading: loadingSongs } = useSongsList();
   
   const artistName = artistEntries[0]?.musicianName || artistEntries[0]?.name || 'Unknown Artist';
+  const feedId = artistEntries[0]?.feedId;
   
-  // Filter songs list to only show songs by this artist (define early)
-  const artistSongs = allSongs?.filter(song => 
-    (song.songArtist || '').toLowerCase() === artistName.toLowerCase()
-  ) || [];
+  // Fetch songs for this artist's feedId (on-demand)
+  const { songs: artistSongs, isLoading: loadingSongs } = useSongsByFeedId(feedId);
   
   // Use the primary entry (highest score) for metadata
   // If no musician entries, infer from songs
