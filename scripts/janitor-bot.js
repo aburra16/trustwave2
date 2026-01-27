@@ -355,34 +355,40 @@ async function main() {
     return;
   }
   
-  // Publish downvotes
+  // Publish downvotes in batches (sign on-the-fly to save memory)
   console.log(`📤 Publishing ${failedSongs.length} downvotes...\n`);
   
   let totalDownvoted = 0;
-  const downvoteEvents = failedSongs.map(({ song }) => createDownvoteEvent(song));
   
-  for (let i = 0; i < downvoteEvents.length; i += BATCH_SIZE) {
-    const batch = downvoteEvents.slice(i, i + BATCH_SIZE);
+  for (let i = 0; i < failedSongs.length; i += BATCH_SIZE) {
+    const batchSongs = failedSongs.slice(i, i + BATCH_SIZE);
+    
+    // Sign just this batch (not all 163k at once)
+    const batchEvents = batchSongs.map(({ song }) => createDownvoteEvent(song));
     
     try {
-      const result = await publishBatch(batch, ws);
+      const result = await publishBatch(batchEvents, ws);
       totalDownvoted += result.okCount;
-      console.log(`  ✅ Batch ${Math.floor(i / BATCH_SIZE) + 1}: ${result.okCount}/${batch.length} downvotes published`);
+      console.log(`  ✅ Batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(failedSongs.length / BATCH_SIZE)}: ${result.okCount}/${batchEvents.length} downvotes published`);
       
       // Update checkpoint with downvoted song IDs
-      batch.forEach((event, idx) => {
-        const songId = failedSongs[i + idx].song.id;
-        checkpoint.downvotedSongs.add(songId);
+      batchSongs.forEach(item => {
+        checkpoint.downvotedSongs.add(item.song.id);
       });
       
-      // Save checkpoint every batch
-      saveCheckpoint(checkpoint.downvotedSongs);
+      // Save checkpoint every 10 batches
+      if ((i / BATCH_SIZE) % 10 === 0) {
+        saveCheckpoint(checkpoint.downvotedSongs);
+      }
       
       await delay(BATCH_DELAY_MS);
     } catch (error) {
-      console.log(`  ❌ Batch failed: ${error.message}`);
+      console.log(`  ❌ Batch ${Math.floor(i / BATCH_SIZE) + 1} failed: ${error.message}`);
     }
   }
+  
+  // Final checkpoint save
+  saveCheckpoint(checkpoint.downvotedSongs);
   
   ws.close();
   
