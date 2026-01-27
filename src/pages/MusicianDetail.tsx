@@ -41,17 +41,13 @@ export default function MusicianDetail() {
   const totalDownvotes = artistEntries.reduce((sum, e) => sum + e.downvotes, 0);
   const userReaction = artistEntries.find(e => e.userReaction)?.userReaction || null;
   
-  console.log('MusicianDetail:', { 
+console.log('MusicianDetail:', { 
     guid,
     artistName,
     entriesFound: artistEntries.length,
     feedIds: artistEntries.map(e => e.feedId),
     songsFound: artistSongs.length,
   });
-  
-  console.log(`Found ${artistSongs.length} songs in the songs list for artist "${artistName}"`);
-  console.log('All songs count:', allSongs?.length);
-  console.log('Sample song artists:', allSongs?.slice(0, 5).map(s => s.songArtist));
   
   const isLoadingEpisodes = loadingSongs;
   
