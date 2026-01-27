@@ -73,10 +73,20 @@ export function AudioPlayer() {
         isExpanded ? 'h-auto' : 'h-20'
       )}
     >
-      {/* Progress bar (thin, at top of player) */}
-      <div className="absolute top-0 left-0 right-0 h-1 bg-secondary">
+      {/* Interactive Progress bar */}
+      <div className="absolute top-0 left-0 right-0 h-1 bg-secondary group/progress cursor-pointer">
+        <Slider
+          value={[progress]}
+          onValueChange={([v]) => {
+            const newTime = (v / 100) * duration;
+            seek(newTime);
+          }}
+          max={100}
+          step={0.1}
+          className="absolute inset-0 h-1 opacity-0 group-hover/progress:opacity-100 transition-opacity"
+        />
         <div 
-          className="h-full bg-gradient-to-r from-tw-purple to-tw-cyan transition-all duration-100"
+          className="h-full bg-gradient-to-r from-tw-purple to-tw-cyan transition-all duration-100 pointer-events-none"
           style={{ width: `${progress}%` }}
         />
       </div>
