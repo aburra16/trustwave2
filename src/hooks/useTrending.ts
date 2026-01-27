@@ -178,19 +178,20 @@ export function useTrendingSongs() {
   const allReactions = dataQuery.data ? Array.from(dataQuery.data.reactions.values()).flat() : [];
   const reactionAuthors = Array.from(new Set(allReactions.map(r => r.pubkey)));
   
-  const { data: trustScores } = useBatchTrustScores(reactionAuthors);
+  const { data: trustScores, isLoading: loadingScores } = useBatchTrustScores(reactionAuthors);
   
+  // Wait for both data and trust scores
   const scoredSongs = dataQuery.data && trustScores
     ? calculateScores(dataQuery.data.items, dataQuery.data.reactions, trustScores, user?.pubkey)
         .filter(item => item.score >= 0)
         .sort((a, b) => b.score - a.score) // Sort by score descending
     : [];
   
-  console.log(`Returning ${scoredSongs.length} scored and sorted songs`);
+  console.log(`Returning ${scoredSongs.length} scored and sorted songs (trustScores: ${trustScores?.size || 0})`);
   
   return {
     songs: scoredSongs,
-    isLoading: dataQuery.isLoading,
+    isLoading: dataQuery.isLoading || loadingScores,
   };
 }
 
