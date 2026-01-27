@@ -11,21 +11,12 @@ export function groupMusiciansByArtist(musicians: ScoredListItem[]): ScoredListI
   // Group by artist name (case-insensitive)
   for (const musician of musicians) {
     const artistName = (musician.musicianName || musician.name || 'Unknown Artist').toLowerCase();
-    console.log('Processing musician:', artistName, {
-      feedId: musician.feedId,
-      feedGuid: musician.feedGuid,
-      musicianFeedGuid: musician.musicianFeedGuid,
-    });
     const existing = artistMap.get(artistName) || [];
     existing.push(musician);
     artistMap.set(artistName, existing);
   }
   
-  console.log('Artist map:', Array.from(artistMap.entries()).map(([name, entries]) => ({
-    name,
-    count: entries.length,
-    feedIds: entries.map(e => e.feedId),
-  })));
+  console.log(`Grouped into ${artistMap.size} unique artists`);
   
   // Create aggregated entries
   const aggregated: ScoredListItem[] = [];
