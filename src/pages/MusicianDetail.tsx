@@ -27,7 +27,12 @@ export default function MusicianDetail() {
   const artistEntries = allMusicians ? getArtistEntries(allMusicians, artistName) : [];
   
   // Use the primary entry (highest score) for metadata
-  const primaryMusician = artistEntries.sort((a, b) => b.score - a.score)[0];
+  // If no musician entries, infer from songs
+  const primaryMusician = artistEntries.sort((a, b) => b.score - a.score)[0] || (artistSongs[0] ? {
+    id: `inferred-${artistName}`,
+    musicianName: artistName,
+    musicianArtwork: artistSongs[0].songArtwork,
+  } as any : null);
   
   // Aggregate stats across all entries
   const totalUpvotes = artistEntries.reduce((sum, e) => sum + e.upvotes, 0);
@@ -92,7 +97,8 @@ export default function MusicianDetail() {
     );
   }
   
-  if (artistEntries.length === 0 && !loadingMusicians) {
+  // If artist not in musicians list but has songs, still show their page
+  if (artistEntries.length === 0 && artistSongs.length === 0 && !loadingMusicians && !loadingSongs) {
     return (
       <MainLayout>
         <div className="container mx-auto px-4 py-8">
@@ -100,10 +106,10 @@ export default function MusicianDetail() {
             <Music className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
             <h2 className="text-xl font-semibold mb-2">Artist Not Found</h2>
             <p className="text-muted-foreground mb-6">
-              This artist hasn't been added to the list yet.
+              This artist hasn't been added to the catalog yet.
             </p>
             <Button asChild>
-              <Link to="/musicians">Back to Musicians</Link>
+              <Link to="/search">Search for Music</Link>
             </Button>
           </div>
         </div>
