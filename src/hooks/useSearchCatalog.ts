@@ -133,20 +133,19 @@ export function useSearchCatalog(searchQuery: string) {
   const dataQuery = useQuery({
     queryKey: ['searchCatalog', searchQuery],
     queryFn: async () => {
-      if (!searchQuery.trim()) return { songs: [], musicians: [] };
+      if (!searchQuery.trim()) return { songs: [], musicians: [], reactions: new Map() };
       
       console.log('Searching catalog for:', searchQuery);
       
       const relay = new NRelay1(DCOSL_RELAY);
       
       try {
-        // We can't search by text, so we fetch more items and filter client-side
-        // Fetch recent items (more likely to match user searches)
+        // Fetch items from relay
         const [songEvents, musicianEvents] = await Promise.all([
           relay.query([{
             kinds: [KINDS.LIST_ITEM, KINDS.LIST_ITEM_REPLACEABLE],
             '#z': [SONGS_LIST_A_TAG],
-            limit: 2000, // Fetch more for better search results
+            limit: 2000,
           }]),
           relay.query([{
             kinds: [KINDS.LIST_ITEM, KINDS.LIST_ITEM_REPLACEABLE],
@@ -169,57 +168,55 @@ export function useSearchCatalog(searchQuery: string) {
           (m.musicianName || m.name || '').toLowerCase().includes(query)
         );
         
-        console.log(`Found ${matchingSongs.length} songs, ${matchingMusicians.length} musicians`);
+        console.log(`Search results: ${matchingSongs.length} songs, ${matchingMusicians.length} musicians`);
         
-        return { songs: matchingSongs, musicians: matchingMusicians };
+        // Fetch reactions for matches only
+        const allMatches = [...matchingSongs, ...matchingMusicians];
+        const itemIds = allMatches.map(i => i.id);
+        const reactions = await fetchReactions(itemIds);
+        
+        return { songs: matchingSongs, musicians: matchingMusicians, reactions };
       } finally {
         await relay.close();
       }
     },
     enabled: searchQuery.trim().length > 0,
-    staleTime: 60 * 1000,
+    staleTime: 2 * 60 * 1000,
   });
   
-  // Fetch reactions for matching items
-  const allItems = [...(dataQuery.data?.songs || []), ...(dataQuery.data?.musicians || [])];
-  const itemIds = allItems.map(i => i.id);
-  
-  const reactionsQuery = useQuery({
-    queryKey: ['searchReactions', itemIds.join(',')],
-    queryFn: async () => {
-      if (itemIds.length === 0) return new Map();
-      return await fetchReactions(itemIds);
-    },
-    enabled: itemIds.length > 0,
-    staleTime: 60 * 1000,
-  });
+  // Get reactions from the data query (already fetched)
+  const reactions = dataQuery.data?.reactions || new Map();
   
   // Get reaction authors for trust scores
-  const allReactions = reactionsQuery.data ? Array.from(reactionsQuery.data.values()).flat() : [];
+  const allReactions = Array.from(reactions.values()).flat();
   const reactionAuthors = Array.from(new Set(allReactions.map(r => r.pubkey)));
   
-  const { data: trustScores } = useBatchTrustScores(reactionAuthors);
+  const { data: trustScores, isLoading: loadingScores } = useBatchTrustScores(reactionAuthors);
   
-  // Calculate scores
-  const scoredSongs = dataQuery.data && reactionsQuery.data && trustScores
-    ? calculateScores(dataQuery.data.songs, reactionsQuery.data, trustScores, user?.pubkey)
+  // Calculate scores (wait for trust scores)
+  const scoredSongs = dataQuery.data && trustScores
+    ? calculateScores(dataQuery.data.songs, reactions, trustScores, user?.pubkey)
         .filter(item => item.score >= 0)
-    : [];
+    : dataQuery.data?.songs || [];
   
-  const scoredMusicians = dataQuery.data && reactionsQuery.data && trustScores
-    ? calculateScores(dataQuery.data.musicians, reactionsQuery.data, trustScores, user?.pubkey)
+  const scoredMusicians = dataQuery.data && trustScores
+    ? calculateScores(dataQuery.data.musicians, reactions, trustScores, user?.pubkey)
         .filter(item => item.score >= 0)
-    : [];
+    : dataQuery.data?.musicians || [];
+  
+  console.log(`After scoring: ${scoredSongs.length} songs, ${scoredMusicians.length} musicians`);
   
   // Filter podcasts from songs
   const musicOnlySongs = filterOutPodcasts(scoredSongs);
   
   // Group musicians
-  const groupedMusicians = groupMusiciansByArtist(scoredMusicians);
+  const groupedMusicians = scoredMusicians.length > 0 ? groupMusiciansByArtist(scoredMusicians) : [];
+  
+  console.log(`Final results: ${musicOnlySongs.length} songs, ${groupedMusicians.length} grouped musicians`);
   
   return {
     songs: musicOnlySongs,
     musicians: groupedMusicians,
-    isLoading: dataQuery.isLoading || reactionsQuery.isLoading,
+    isLoading: dataQuery.isLoading || loadingScores,
   };
 }
