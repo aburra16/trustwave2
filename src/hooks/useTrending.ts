@@ -139,67 +139,19 @@ function calculateScores(
 }
 
 /**
- * Hook for trending songs with client-side pagination
- * Fetches all songs once, then paginates in the component
+ * Hook for trending songs
+ * Just reuse the existing useSongsList (already has all the logic)
  */
 export function useTrendingSongs() {
-  const { user } = useCurrentUser();
-  const { hiddenIds } = useHiddenItems();
+  // Import here to avoid circular dependency
+  const { useSongsList } = require('./useDecentralizedList');
+  const { data: songs, isLoading } = useSongsList();
   
-  const dataQuery = useQuery({
-    queryKey: ['trending', 'songs', 'data'],
-    queryFn: async () => {
-      console.log('Fetching trending songs...');
-      
-      const relay = new NRelay1(DCOSL_RELAY);
-      
-      try {
-        const items = await relay.query([{
-          kinds: [KINDS.LIST_ITEM, KINDS.LIST_ITEM_REPLACEABLE],
-          '#z': [SONGS_LIST_A_TAG],
-          limit: 1000, // Fetch up to 1000 songs
-        }]);
-        
-        const parsedItems = items.map(parseListItem).filter(item => !hiddenIds.includes(item.id));
-        
-        const itemIds = parsedItems.map(i => i.id);
-        const reactions = await fetchReactionsForItems(itemIds);
-        
-        console.log(`Fetched ${parsedItems.length} songs with reactions`);
-        
-        return { items: parsedItems, reactions };
-      } finally {
-        await relay.close();
-      }
-    },
-    staleTime: 2 * 60 * 1000,
-  });
-  
-  const allReactions = dataQuery.data ? Array.from(dataQuery.data.reactions.values()).flat() : [];
-  const reactionAuthors = Array.from(new Set(allReactions.map(r => r.pubkey)));
-  
-  const { data: trustScores, isLoading: loadingScores } = useBatchTrustScores(reactionAuthors);
-  
-  console.log('useTrendingSongs state:', {
-    hasData: !!dataQuery.data,
-    hasTrustScores: !!trustScores,
-    trustScoresSize: trustScores?.size || 0,
-    loadingData: dataQuery.isLoading,
-    loadingScores,
-  });
-  
-  // Calculate scores only when BOTH data and trust scores are ready
-  const scoredSongs = dataQuery.data && trustScores && !loadingScores
-    ? calculateScores(dataQuery.data.items, dataQuery.data.reactions, trustScores, user?.pubkey)
-        .filter(item => item.score >= 0)
-        .sort((a, b) => b.score - a.score) // Sort by score descending
-    : [];
-  
-  console.log(`Returning ${scoredSongs.length} scored and sorted songs (trustScores: ${trustScores?.size || 0})`);
+  console.log(`useTrendingSongs: ${songs?.length || 0} songs from useSongsList`);
   
   return {
-    songs: scoredSongs,
-    isLoading: dataQuery.isLoading || loadingScores,
+    songs: songs || [],
+    isLoading,
   };
 }
 
