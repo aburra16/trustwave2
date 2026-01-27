@@ -20,7 +20,7 @@ import { WebSocket } from 'ws';
 // ============================================================================
 
 const NSEC = 'nsec1xfm674c09pp0sttes9k0hpmy80mpku05p707thhfw3puncfgum5s3nlznh'; // TrustWave Indexer nsec
-const DB_PATH = '/Users/avinashburra/downloads/podcastindex'; // Path to your SQLite DB file
+const DB_PATH = '/Users/avinashburra/downloads/podcastindex/podcastindex.db'; // Path to your SQLite DB file
 const RELAY_URL = 'wss://dcosl.brainstorm.world';
 const BATCH_SIZE = 500; // Events per batch (match relay maxFilterLimit)
 const BATCH_DELAY_MS = 2000; // Delay between batches (2 seconds)
