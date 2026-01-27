@@ -151,10 +151,16 @@ async function main() {
   tables.forEach(t => console.log(`  - ${t.name}`));
   console.log('');
   
+  // Check the schema of the podcasts table
+  console.log('📋 Podcasts table columns:');
+  const columns = db.prepare(`PRAGMA table_info(podcasts)`).all();
+  columns.forEach(c => console.log(`  - ${c.name} (${c.type})`));
+  console.log('');
+  
   // Get count of music feeds
   const musicFeedsCount = db.prepare(`
     SELECT COUNT(*) as count 
-    FROM feeds 
+    FROM podcasts 
     WHERE medium = 'music'
   `).get();
   
@@ -174,7 +180,7 @@ async function main() {
   // Query music feeds
   const feeds = db.prepare(`
     SELECT id, podcastGuid, title, author, url, artwork, image
-    FROM feeds 
+    FROM podcasts 
     WHERE medium = 'music'
     LIMIT 100
   `).all(); // Start with 100 for testing
