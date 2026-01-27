@@ -143,6 +143,14 @@ async function main() {
   console.log('📂 Opening database:', DB_PATH);
   const db = new Database(DB_PATH, { readonly: true });
   
+  // List all tables
+  console.log('📋 Available tables:');
+  const tables = db.prepare(`
+    SELECT name FROM sqlite_master WHERE type='table'
+  `).all();
+  tables.forEach(t => console.log(`  - ${t.name}`));
+  console.log('');
+  
   // Get count of music feeds
   const musicFeedsCount = db.prepare(`
     SELECT COUNT(*) as count 
