@@ -60,9 +60,10 @@ function parseListItem(event: NostrEvent): ListItem {
 
 /**
  * Fetch list items from the DCOSL relay
+ * Limited to avoid performance issues with large datasets
  */
-async function fetchListItems(listATag: string): Promise<ListItem[]> {
-  console.log(`Fetching list items for: ${listATag}`);
+async function fetchListItems(listATag: string, limit = 500): Promise<ListItem[]> {
+  console.log(`Fetching list items for: ${listATag} (limit: ${limit})`);
   console.log(`Connecting to relay: ${DCOSL_RELAY}`);
   
   const relay = new NRelay1(DCOSL_RELAY);
@@ -71,7 +72,7 @@ async function fetchListItems(listATag: string): Promise<ListItem[]> {
     const filter = {
       kinds: [KINDS.LIST_ITEM, KINDS.LIST_ITEM_REPLACEABLE],
       '#z': [listATag],
-      limit: 10000, // Relay now supports 10k limit
+      limit, // Configurable limit
     };
     console.log('Query filter:', JSON.stringify(filter));
     
@@ -232,7 +233,7 @@ export function useSongsList() {
     queryFn: async () => {
       console.log('useSongsList: Fetching songs...');
       
-      const items = await fetchListItems(SONGS_LIST_A_TAG);
+      const items = await fetchListItems(SONGS_LIST_A_TAG, 1000); // Limit to 1000 for performance
       console.log(`useSongsList: Found ${items.length} items`);
       
       if (items.length === 0) return { items: [], reactions: new Map() };
@@ -302,7 +303,7 @@ export function useMusiciansList() {
     queryFn: async () => {
       console.log('useMusiciansList: Fetching musicians...');
       
-      const items = await fetchListItems(MUSICIANS_LIST_A_TAG);
+      const items = await fetchListItems(MUSICIANS_LIST_A_TAG, 1000); // Limit to 1000 for performance
       console.log(`useMusiciansList: Found ${items.length} items`);
       
       if (items.length === 0) return { items: [], reactions: new Map() };
