@@ -156,7 +156,7 @@ export default function Search() {
         )}
         
         {/* Empty State */}
-        {!showResults && !loadingSongs && !loadingMusicians && (
+        {!showResults && !isLoading && (
           <div className="text-center py-16">
             <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-tw-purple/20 to-tw-cyan/20 flex items-center justify-center mx-auto mb-6">
               <SearchIcon className="w-10 h-10 text-muted-foreground" />
