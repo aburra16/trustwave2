@@ -189,15 +189,20 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     // Set up one-time listener to auto-play when ready
     const handleLoadedData = () => {
       console.log('Audio loaded and ready to play');
+      console.log('isPlayingRef.current:', isPlayingRef.current);
+      console.log('state.isPlaying:', state.isPlaying);
       dispatch({ type: 'SET_LOADING', loading: false });
       
       // Auto-play if we're supposed to be playing
-      if (isPlayingRef.current) {
+      // Use state.isPlaying directly since ref might not be synced yet
+      if (state.isPlaying) {
         console.log('Auto-playing loaded audio...');
         audio.play().catch(error => {
           console.error('Auto-play failed:', error);
           dispatch({ type: 'SET_ERROR', error: 'Failed to play audio' });
         });
+      } else {
+        console.log('Not auto-playing - isPlaying is false');
       }
     };
     
