@@ -16,23 +16,24 @@ export default function TrendingSongs() {
     description: 'Top songs of all time, ranked by your trusted network.',
   });
   
-  const { songs, isLoading, fetchNextPage, hasNextPage, isFetchingNextPage } = useTrendingSongs();
+  const { songs, isLoading } = useTrendingSongs();
   const { ref: loadMoreRef, inView } = useInView({
     threshold: 0,
-    rootMargin: '400px', // Start loading 400px before reaching the trigger
+    rootMargin: '400px',
   });
+  
+  // Client-side pagination
+  const [displayCount, setDisplayCount] = React.useState(ITEMS_PER_PAGE);
+  const displayedSongs = songs?.slice(0, displayCount) || [];
+  const hasMore = songs && displayCount < songs.length;
   
   // Auto-load when scrolling near bottom
   useEffect(() => {
-    if (inView && hasNextPage && !isFetchingNextPage) {
-      fetchNextPage();
+    if (inView && hasMore && !isLoading) {
+      console.log('Loading more songs...');
+      setDisplayCount(prev => prev + ITEMS_PER_PAGE);
     }
-  }, [inView, hasNextPage, isFetchingNextPage, fetchNextPage]);
-  
-  // Paginate the songs client-side (25 at a time)
-  const [displayCount, setDisplayCount] = React.useState(ITEMS_PER_PAGE);
-  const displayedSongs = songs.slice(0, displayCount);
-  const hasMore = displayCount < songs.length;
+  }, [inView, hasMore, isLoading]);
   
   return (
     <MainLayout>

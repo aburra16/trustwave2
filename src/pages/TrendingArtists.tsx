@@ -12,31 +12,32 @@ import { APP_NAME } from '@/lib/constants';
 const ITEMS_PER_PAGE = 25;
 
 export default function TrendingArtists() {
-  useSeoMeta({
+useSeoMeta({
     title: `Trending Artists | ${APP_NAME}`,
     description: 'Top artists of all time, ranked by your trusted network.',
   });
   
-  const { artists, isLoading, fetchNextPage, hasNextPage, isFetchingNextPage } = useTrendingArtists();
+  const { artists, isLoading } = useTrendingArtists();
   const { ref: loadMoreRef, inView } = useInView({
     threshold: 0,
     rootMargin: '400px',
   });
   
-  // Auto-load when scrolling near bottom
-  useEffect(() => {
-    if (inView && hasNextPage && !isFetchingNextPage) {
-      fetchNextPage();
-    }
-  }, [inView, hasNextPage, isFetchingNextPage, fetchNextPage]);
-  
   // Group by artist name
   const groupedArtists = artists ? groupMusiciansByArtist(artists) : [];
   
-  // Paginate client-side
+  // Client-side pagination
   const [displayCount, setDisplayCount] = React.useState(ITEMS_PER_PAGE);
   const displayedArtists = groupedArtists.slice(0, displayCount);
   const hasMore = displayCount < groupedArtists.length;
+  
+  // Auto-load when scrolling near bottom
+  useEffect(() => {
+    if (inView && hasMore && !isLoading) {
+      console.log('Loading more artists...');
+      setDisplayCount(prev => prev + ITEMS_PER_PAGE);
+    }
+  }, [inView, hasMore, isLoading]);
   
   return (
     <MainLayout>
@@ -49,7 +50,7 @@ export default function TrendingArtists() {
             </div>
             Trending Artists
           </h1>
-          <p className="text-muted-foreground mt-1">
+<p className="text-muted-foreground mt-1">
             Top artists of all time, ranked by your trusted network
           </p>
         </div>

@@ -1,4 +1,4 @@
-import { useInfiniteQuery } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { NRelay1 } from '@nostrify/nostrify';
 import { useBatchTrustScores } from './useTrustScore';
 import { useCurrentUser } from './useCurrentUser';
@@ -138,87 +138,73 @@ function calculateScores(
 }
 
 /**
- * Hook for trending songs (last 7 days) with infinite scroll pagination
+ * Hook for trending songs with client-side pagination
+ * Fetches all songs once, then paginates in the component
  */
 export function useTrendingSongs() {
   const { user } = useCurrentUser();
   const { hiddenIds } = useHiddenItems();
   
-  // First get all items and reactions
-  const dataQuery = useInfiniteQuery({
+  const dataQuery = useQuery({
     queryKey: ['trending', 'songs', 'data'],
-    queryFn: async ({ pageParam = 0 }) => {
-      const offset = pageParam * PAGE_SIZE;
-      
-      console.log(`Fetching trending songs page ${pageParam} (offset: ${offset})`);
+    queryFn: async () => {
+      console.log('Fetching trending songs...');
       
       const relay = new NRelay1(DCOSL_RELAY);
       
       try {
-        // Fetch list items (all-time)
         const items = await relay.query([{
           kinds: [KINDS.LIST_ITEM, KINDS.LIST_ITEM_REPLACEABLE],
           '#z': [SONGS_LIST_A_TAG],
-          limit: PAGE_SIZE * 10, // Fetch larger batch, we'll paginate client-side
+          limit: 1000, // Fetch up to 1000 songs
         }]);
         
         const parsedItems = items.map(parseListItem).filter(item => !hiddenIds.includes(item.id));
         
-        // Fetch reactions for these items (all-time)
         const itemIds = parsedItems.map(i => i.id);
         const reactions = await fetchReactionsForItems(itemIds);
+        
+        console.log(`Fetched ${parsedItems.length} songs with reactions`);
         
         return { items: parsedItems, reactions };
       } finally {
         await relay.close();
       }
     },
-    getNextPageParam: (lastPage, pages) => {
-      // Simple pagination - just increment page number
-      return pages.length;
-    },
-    initialPageParam: 0,
     staleTime: 2 * 60 * 1000,
   });
   
-  // Get all reaction authors
-  const allReactions = dataQuery.data?.pages.flatMap(page => 
-    Array.from(page.reactions.values()).flat()
-  ) || [];
-  
+  const allReactions = dataQuery.data ? Array.from(dataQuery.data.reactions.values()).flat() : [];
   const reactionAuthors = Array.from(new Set(allReactions.map(r => r.pubkey)));
   
-  // Fetch trust scores
   const { data: trustScores } = useBatchTrustScores(reactionAuthors);
   
-  // Calculate scores for all pages
-  const scoredPages = dataQuery.data?.pages.map(page => {
-    const scored = calculateScores(page.items, page.reactions, trustScores || new Map(), user?.pubkey);
-    return scored.filter(item => item.score >= 0).sort((a, b) => b.score - a.score);
-  }) || [];
+  const scoredSongs = dataQuery.data && trustScores
+    ? calculateScores(dataQuery.data.items, dataQuery.data.reactions, trustScores, user?.pubkey)
+        .filter(item => item.score >= 0)
+        .sort((a, b) => b.score - a.score) // Sort by score descending
+    : [];
   
-  // Flatten and paginate client-side
-  const allScored = scoredPages.flat();
+  console.log(`Returning ${scoredSongs.length} scored and sorted songs`);
   
   return {
-    ...dataQuery,
-    songs: allScored,
-    hasMore: allScored.length >= PAGE_SIZE && allScored.length % PAGE_SIZE === 0,
+    songs: scoredSongs,
+    isLoading: dataQuery.isLoading,
   };
 }
 
 /**
- * Hook for trending artists (last 7 days) with infinite scroll pagination
+ * Hook for trending artists with client-side pagination
  * Aggregates scores across all their songs
  */
 export function useTrendingArtists() {
   const { user } = useCurrentUser();
   const { hiddenIds } = useHiddenItems();
   
-  const dataQuery = useInfiniteQuery({
+  const dataQuery = useQuery({
     queryKey: ['trending', 'artists', 'data'],
-    queryFn: async ({ pageParam = 0 }) => {
-      console.log(`Fetching trending artists page ${pageParam}`);
+    queryFn: async () => {
+      console.log('Fetching trending artists...');
       
       const relay = new NRelay1(DCOSL_RELAY);
       
@@ -226,40 +212,37 @@ export function useTrendingArtists() {
         const items = await relay.query([{
           kinds: [KINDS.LIST_ITEM, KINDS.LIST_ITEM_REPLACEABLE],
           '#z': [MUSICIANS_LIST_A_TAG],
-          limit: PAGE_SIZE * 10,
+          limit: 1000,
         }]);
         
         const parsedItems = items.map(parseListItem).filter(item => !hiddenIds.includes(item.id));
         const itemIds = parsedItems.map(i => i.id);
         const reactions = await fetchReactionsForItems(itemIds);
         
+        console.log(`Fetched ${parsedItems.length} musicians with reactions`);
+        
         return { items: parsedItems, reactions };
       } finally {
         await relay.close();
       }
     },
-    getNextPageParam: (lastPage, pages) => pages.length,
-    initialPageParam: 0,
     staleTime: 2 * 60 * 1000,
   });
   
-  const allReactions = dataQuery.data?.pages.flatMap(page => 
-    Array.from(page.reactions.values()).flat()
-  ) || [];
-  
+  const allReactions = dataQuery.data ? Array.from(dataQuery.data.reactions.values()).flat() : [];
   const reactionAuthors = Array.from(new Set(allReactions.map(r => r.pubkey)));
   const { data: trustScores } = useBatchTrustScores(reactionAuthors);
   
-  const scoredPages = dataQuery.data?.pages.map(page => {
-    const scored = calculateScores(page.items, page.reactions, trustScores || new Map(), user?.pubkey);
-    return scored.filter(item => item.score >= 0).sort((a, b) => b.score - a.score);
-  }) || [];
+  const scoredArtists = dataQuery.data && trustScores
+    ? calculateScores(dataQuery.data.items, dataQuery.data.reactions, trustScores, user?.pubkey)
+        .filter(item => item.score >= 0)
+        .sort((a, b) => b.score - a.score) // Sort by score descending
+    : [];
   
-  const allScored = scoredPages.flat();
+  console.log(`Returning ${scoredArtists.length} scored and sorted artists`);
   
   return {
-    ...dataQuery,
-    artists: allScored,
-    hasMore: allScored.length >= PAGE_SIZE && allScored.length % PAGE_SIZE === 0,
+    artists: scoredArtists,
+    isLoading: dataQuery.isLoading,
   };
 }
