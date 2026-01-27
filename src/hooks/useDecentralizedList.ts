@@ -71,7 +71,7 @@ async function fetchListItems(listATag: string): Promise<ListItem[]> {
     const filter = {
       kinds: [KINDS.LIST_ITEM, KINDS.LIST_ITEM_REPLACEABLE],
       '#z': [listATag],
-      limit: 500,
+      limit: 10000, // Relay now supports 10k limit
     };
     console.log('Query filter:', JSON.stringify(filter));
     
