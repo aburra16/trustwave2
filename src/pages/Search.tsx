@@ -1,6 +1,6 @@
 import { useSeoMeta } from '@unhead/react';
 import { Search as SearchIcon, Music, Users, X } from 'lucide-react';
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
