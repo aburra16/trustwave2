@@ -1,0 +1,19 @@
+{
+  "name": "scripts",
+  "version": "1.0.0",
+  "description": "This script imports music from the Podcast Index SQLite database dump to TrustWave's decentralized lists.",
+  "main": "import-podcast-index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "@noble/hashes": "^2.0.1",
+    "better-sqlite3": "^12.6.2",
+    "nostr-tools": "^2.20.0",
+    "ws": "^8.19.0"
+  }
+}
