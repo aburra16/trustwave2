@@ -46,7 +46,9 @@ export default function MusicianDetail() {
     (song.songArtist || '').toLowerCase() === artistName.toLowerCase()
   ) || [];
   
-  console.log(`Found ${artistSongs.length} songs in the songs list for ${artistName}`);
+  console.log(`Found ${artistSongs.length} songs in the songs list for artist "${artistName}"`);
+  console.log('All songs count:', allSongs?.length);
+  console.log('Sample song artists:', allSongs?.slice(0, 5).map(s => s.songArtist));
   
   const isLoadingEpisodes = loadingSongs;
   
