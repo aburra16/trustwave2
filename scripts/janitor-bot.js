@@ -101,6 +101,12 @@ function delay(ms) {
 function failsGauntlet(song) {
   const reasons = [];
   
+  // Check medium tag (if exists, must be 'music' or 'song')
+  const medium = (song.medium || '').toLowerCase();
+  if (medium && medium !== 'music' && medium !== 'song') {
+    reasons.push(`wrong medium type: ${medium}`);
+  }
+  
   // Check duration
   const duration = parseInt(song.duration || '0', 10);
   if (duration > MAX_DURATION) {
@@ -172,6 +178,7 @@ async function fetchAllSongs(ws) {
               if (tag[0] === 'duration') song.duration = tag[1];
               if (tag[0] === 'feedId') song.feedId = tag[1];
               if (tag[0] === 'url') song.url = tag[1];
+              if (tag[0] === 'medium') song.medium = tag[1];
             }
             
             batchSongs.push(song);

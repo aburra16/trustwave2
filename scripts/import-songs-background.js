@@ -83,6 +83,7 @@ function createSongEvent(episode, musicianName, feedId, feedGuid, artwork) {
     content: '',
     tags: [
       ['z', SONGS_LIST_A_TAG],
+      ['medium', 'music'], // Quality stamp - validated at import time
       ['t', episode.guid],
       ['title', episode.title],
       ['artist', musicianName],
