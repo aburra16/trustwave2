@@ -213,6 +213,23 @@ async function fetchMusicians(ws) {
   return musicians;
 }
 
+// Podcast keyword patterns (same as janitor bot)
+const PODCAST_PATTERNS = [
+  /\bepisode\s+\d+/i,      // "Episode 123"
+  /\bep\.?\s+\d+/i,        // "Ep. 5" or "Ep 5"
+  /\binterview\b/i,        // "Interview"
+  /\btrailer\b/i,          // "Trailer"
+  /\bteaser\b/i,           // "Teaser"
+  /\btalk\b/i,             // "Talk"
+  /\bpodcast\b/i,          // "Podcast"
+  /\bdiscussion\b/i,       // "Discussion"
+  /\bconversation\b/i,     // "Conversation"
+  /\bnews\b/i,             // "News"
+];
+
+const MAX_MUSIC_DURATION = 15 * 60; // 15 minutes
+const MIN_MUSIC_DURATION = 45; // 45 seconds
+
 async function fetchEpisodesFromAPI(feedId) {
   try {
     const response = await fetch(`${API_PROXY}/episodes/byfeedid?id=${feedId}&max=100`);
@@ -221,7 +238,32 @@ async function fetchEpisodesFromAPI(feedId) {
       return [];
     }
     const data = await response.json();
-    return data.items || [];
+    const episodes = data.items || [];
+    
+    // FILTER: Only return episodes that look like music
+    const validEpisodes = episodes.filter(ep => {
+      const duration = ep.duration || 0;
+      const title = (ep.title || '').toLowerCase();
+      
+      // Duration checks
+      if (duration < MIN_MUSIC_DURATION || duration > MAX_MUSIC_DURATION) {
+        return false;
+      }
+      
+      // Keyword checks
+      const hasPodcastKeyword = PODCAST_PATTERNS.some(pattern => pattern.test(title));
+      if (hasPodcastKeyword) {
+        return false;
+      }
+      
+      return true;
+    });
+    
+    if (validEpisodes.length < episodes.length) {
+      console.log(`    🧹 Filtered out ${episodes.length - validEpisodes.length} non-music episodes`);
+    }
+    
+    return validEpisodes;
   } catch (error) {
     console.log(`    ⚠️  API error: ${error.message}`);
     return [];
