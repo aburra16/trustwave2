@@ -7,7 +7,6 @@ import { DCOSL_RELAY, KINDS, SONGS_LIST_A_TAG, MUSICIANS_LIST_A_TAG, TRUST_THRES
 import type { ListItem, ScoredListItem } from '@/lib/types';
 import type { NostrEvent } from '@nostrify/nostrify';
 
-const SEVEN_DAYS_AGO = Math.floor(Date.now() / 1000) - (7 * 24 * 60 * 60);
 const PAGE_SIZE = 25;
 
 /**
@@ -156,19 +155,18 @@ export function useTrendingSongs() {
       const relay = new NRelay1(DCOSL_RELAY);
       
       try {
-        // Fetch recent list items
+        // Fetch list items (all-time)
         const items = await relay.query([{
           kinds: [KINDS.LIST_ITEM, KINDS.LIST_ITEM_REPLACEABLE],
           '#z': [SONGS_LIST_A_TAG],
-          since: SEVEN_DAYS_AGO,
           limit: PAGE_SIZE * 10, // Fetch larger batch, we'll paginate client-side
         }]);
         
         const parsedItems = items.map(parseListItem).filter(item => !hiddenIds.includes(item.id));
         
-        // Fetch reactions for these items (last 7 days)
+        // Fetch reactions for these items (all-time)
         const itemIds = parsedItems.map(i => i.id);
-        const reactions = await fetchReactionsForItems(itemIds, SEVEN_DAYS_AGO);
+        const reactions = await fetchReactionsForItems(itemIds);
         
         return { items: parsedItems, reactions };
       } finally {
@@ -228,13 +226,12 @@ export function useTrendingArtists() {
         const items = await relay.query([{
           kinds: [KINDS.LIST_ITEM, KINDS.LIST_ITEM_REPLACEABLE],
           '#z': [MUSICIANS_LIST_A_TAG],
-          since: SEVEN_DAYS_AGO,
           limit: PAGE_SIZE * 10,
         }]);
         
         const parsedItems = items.map(parseListItem).filter(item => !hiddenIds.includes(item.id));
         const itemIds = parsedItems.map(i => i.id);
-        const reactions = await fetchReactionsForItems(itemIds, SEVEN_DAYS_AGO);
+        const reactions = await fetchReactionsForItems(itemIds);
         
         return { items: parsedItems, reactions };
       } finally {

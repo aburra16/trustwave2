@@ -13,7 +13,7 @@ const ITEMS_PER_PAGE = 25;
 export default function TrendingSongs() {
   useSeoMeta({
     title: `Trending Songs | ${APP_NAME}`,
-    description: 'Top songs from the last 7 days, curated by your trusted network.',
+    description: 'Top songs of all time, ranked by your trusted network.',
   });
   
   const { songs, isLoading, fetchNextPage, hasNextPage, isFetchingNextPage } = useTrendingSongs();
@@ -46,7 +46,7 @@ export default function TrendingSongs() {
             Trending Songs
           </h1>
           <p className="text-muted-foreground mt-1">
-            Top tracks from the last 7 days, ranked by your trusted network
+            Top tracks of all time, ranked by your trusted network
           </p>
         </div>
         
