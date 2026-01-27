@@ -1,6 +1,6 @@
 import { useSeoMeta } from '@unhead/react';
 import { Search as SearchIcon, Music, Users, X } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -17,15 +17,25 @@ export default function Search() {
   });
   
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedQuery, setDebouncedQuery] = useState('');
   
-  // Use direct relay search (not limited to loaded items)
-  const { data: searchResults, isLoading } = useSearchCatalog(searchQuery);
+  // Debounce search query (wait 500ms after user stops typing)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedQuery(searchQuery);
+    }, 500);
+    
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+  
+  // Use direct relay search with debounced query
+  const { data: searchResults, isLoading } = useSearchCatalog(debouncedQuery);
   
   const filteredSongs = searchResults?.songs || [];
   const filteredMusicians = searchResults?.musicians || [];
   
   const hasResults = filteredSongs.length > 0 || filteredMusicians.length > 0;
-  const showResults = searchQuery.trim().length > 0;
+  const showResults = debouncedQuery.trim().length > 0;
   
   return (
     <MainLayout>
