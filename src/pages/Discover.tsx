@@ -7,6 +7,7 @@ import { SongCard } from '@/components/songs/SongCard';
 import { MusicianCard } from '@/components/musicians/MusicianCard';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useSongsList, useMusiciansList } from '@/hooks/useDecentralizedList';
+import { useListCounts } from '@/hooks/useListCounts';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { APP_NAME, APP_TAGLINE, APP_DESCRIPTION } from '@/lib/constants';
 import { LoginArea } from '@/components/auth/LoginArea';
@@ -20,6 +21,7 @@ export default function Discover() {
   const { user } = useCurrentUser();
   const { data: songs, isLoading: loadingSongs } = useSongsList();
   const { data: musicians, isLoading: loadingMusicians } = useMusiciansList();
+  const { data: counts } = useListCounts(); // Simple counts without scoring
   
   const topSongs = songs?.slice(0, 6) || [];
   const topMusicians = musicians?.slice(0, 5) || [];
@@ -65,11 +67,11 @@ export default function Discover() {
           {/* Stats */}
           <div className="flex justify-center gap-8 mt-12">
             <div className="text-center">
-              <div className="text-3xl font-bold gradient-text">{songs?.length || 0}</div>
+              <div className="text-3xl font-bold gradient-text">{counts?.songs || 0}</div>
               <div className="text-sm text-muted-foreground">Songs</div>
             </div>
             <div className="text-center">
-              <div className="text-3xl font-bold gradient-text">{musicians?.length || 0}</div>
+              <div className="text-3xl font-bold gradient-text">{counts?.musicians || 0}</div>
               <div className="text-sm text-muted-foreground">Artists</div>
             </div>
             <div className="text-center">
