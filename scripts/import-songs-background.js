@@ -77,20 +77,22 @@ function delay(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-function createSongEvent(episode, musicianName, feedId, feedGuid, artwork) {
+function createSongEvent(episode, musicianName, feedId, feedGuid, artwork, musicianEventId) {
   return finalizeEvent({
     kind: 9999,
     content: '',
     tags: [
       ['z', SONGS_LIST_A_TAG],
       ['medium', 'music'], // Quality stamp - validated at import time
-      ['t', episode.guid],
+      ['t', episode.guid], // Episode GUID (unique identifier)
       ['title', episode.title],
       ['artist', musicianName],
       ['url', episode.enclosureUrl],
       ['duration', String(episode.duration || 0)],
       ['feedId', String(feedId)],
       ['feedGuid', feedGuid || ''],
+      ['e', musicianEventId], // Parent musician event ID (queryable via #e!)
+      ['g', feedGuid || ''], // Feed GUID in single-letter tag (queryable via #g!)
       ['artwork', episode.image || artwork || ''],
       ['alt', `Song: ${episode.title} by ${musicianName}`],
     ].filter(tag => tag[1]),
@@ -327,9 +329,9 @@ async function main() {
       continue;
     }
     
-    // Create song events
+    // Create song events (link to parent musician via 'e' tag)
     const songEvents = episodes.map(ep => 
-      createSongEvent(ep, musician.name, musician.feedId, musician.feedGuid, musician.artwork)
+      createSongEvent(ep, musician.name, musician.feedId, musician.feedGuid, musician.artwork, musician.id)
     );
     
     // Publish in batches

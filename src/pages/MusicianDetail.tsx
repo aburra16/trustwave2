@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { SongCard } from '@/components/songs/SongCard';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useMusicianByGuid } from '@/hooks/useMusicianByGuid';
+import { useSongsByMusician } from '@/hooks/useSongsByMusician';
 import { usePodcastIndexEpisodes } from '@/hooks/usePodcastIndex';
 import { usePublishReaction } from '@/hooks/useReaction';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
@@ -22,17 +23,25 @@ export default function MusicianDetail() {
   // Fetch musician(s) by GUID (on-demand, works even if not in loaded list)
   const { musicians: artistEntries, isLoading: loadingMusicians } = useMusicianByGuid(guid);
   
-  const artistName = artistEntries[0]?.musicianName || artistEntries[0]?.name || 'Unknown Artist';
+const artistName = artistEntries[0]?.musicianName || artistEntries[0]?.name || 'Unknown Artist';
   const feedId = artistEntries[0]?.feedId;
+  const feedGuid = guid; // The GUID from the URL is the feed GUID
   const artistArtwork = artistEntries[0]?.musicianArtwork;
+  const musicianEventIds = artistEntries.map(e => e.id);
   
-  // Fetch episodes from Podcast Index API (source of truth for artist's catalog)
-  const { data: episodes, isLoading: loadingEpisodes } = usePodcastIndexEpisodes(feedId);
+  // PRIMARY: Fetch songs from relay (votable, with WoT scores)
+  const { songs: relaySongs, isLoading: loadingRelaySongs } = useSongsByMusician(feedGuid, musicianEventIds);
   
-  // Convert episodes to ScoredListItem format (unscored, just for playback)
-  const artistSongs: ScoredListItem[] = episodes?.map(ep => ({
-    id: `episode-${ep.guid}`,
-    pubkey: artistEntries[0]?.pubkey || '',
+  // SECONDARY: Fetch from API (preview only, for songs not yet imported)
+  const { data: apiEpisodes, isLoading: loadingApiEpisodes } = usePodcastIndexEpisodes(feedId, relaySongs.length === 0);
+  
+  // Combine: Relay songs first (votable), then API episodes (preview)
+  const apiSongsNotOnRelay: ScoredListItem[] = apiEpisodes?.filter(ep => 
+    // Only show API episodes that aren't already on relay
+    !relaySongs.some(rs => rs.songGuid === ep.guid)
+  ).map(ep => ({
+    id: `api-${ep.guid}`,
+    pubkey: '',
     listATag: '',
     songGuid: ep.guid,
     songTitle: ep.title,
@@ -48,9 +57,11 @@ export default function MusicianDetail() {
     upvotes: 0,
     downvotes: 0,
     userReaction: null,
-  })) || [];
+    isPreview: true, // Mark as preview (not on relay yet)
+  } as any)) || [];
   
-  const loadingSongs = loadingEpisodes;
+  const artistSongs = [...relaySongs, ...apiSongsNotOnRelay];
+  const loadingSongs = loadingRelaySongs || loadingApiEpisodes;
   
   // Use the primary entry (highest score) for metadata
   // If no musician entries, infer from songs
