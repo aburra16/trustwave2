@@ -25,22 +25,25 @@ export default function MusicianDetail() {
   
 const artistName = artistEntries[0]?.musicianName || artistEntries[0]?.name || 'Unknown Artist';
   const feedId = artistEntries[0]?.feedId;
-  const feedGuid = guid; // The GUID from the URL is the feed GUID
   const artistArtwork = artistEntries[0]?.musicianArtwork;
   const musicianEventIds = artistEntries.map(e => e.id);
   
-  // PRIMARY: Fetch songs from relay (votable, with WoT scores)
-  const { songs: relaySongs, isLoading: loadingRelaySongs } = useSongsByMusician(feedGuid, musicianEventIds);
+  console.log('Fetching songs for musician event IDs:', musicianEventIds);
   
-  // SECONDARY: Fetch from API (preview only, for songs not yet imported)
-  const { data: apiEpisodes, isLoading: loadingApiEpisodes } = usePodcastIndexEpisodes(feedId, relaySongs.length === 0);
+  // PRIMARY: Fetch songs from relay using parent musician event ID
+  const { songs: relaySongs, isLoading: loadingRelaySongs } = useSongsByMusician(undefined, musicianEventIds);
   
-  // Combine: Relay songs first (votable), then API episodes (preview)
-  const apiSongsNotOnRelay: ScoredListItem[] = apiEpisodes?.filter(ep => 
-    // Only show API episodes that aren't already on relay
-    !relaySongs.some(rs => rs.songGuid === ep.guid)
-  ).map(ep => ({
-    id: `api-${ep.guid}`,
+  console.log(`Found ${relaySongs.length} songs on relay`);
+  
+  // SECONDARY: Fetch from API if relay has no songs (fallback/preview)
+  const needsApiFallback = !loadingRelaySongs && relaySongs.length === 0;
+  const { data: apiEpisodes, isLoading: loadingApiEpisodes } = usePodcastIndexEpisodes(feedId, needsApiFallback);
+  
+  console.log(`API fallback: ${needsApiFallback ? 'enabled' : 'disabled'}, found ${apiEpisodes?.length || 0} episodes`);
+  
+  // Convert API episodes to preview format (can be imported)
+  const apiPreviewSongs: ScoredListItem[] = apiEpisodes?.map(ep => ({
+    id: `api-preview-${ep.guid}`,
     pubkey: '',
     listATag: '',
     songGuid: ep.guid,
@@ -57,11 +60,11 @@ const artistName = artistEntries[0]?.musicianName || artistEntries[0]?.name || '
     upvotes: 0,
     downvotes: 0,
     userReaction: null,
-    isPreview: true, // Mark as preview (not on relay yet)
+    isApiPreview: true, // Flag for UI rendering
   } as any)) || [];
   
-  const artistSongs = [...relaySongs, ...apiSongsNotOnRelay];
-  const loadingSongs = loadingRelaySongs || loadingApiEpisodes;
+  const artistSongs = relaySongs; // Only show relay songs (votable)
+  const loadingSongs = loadingRelaySongs;
   
   // Use the primary entry (highest score) for metadata
   // If no musician entries, infer from songs
