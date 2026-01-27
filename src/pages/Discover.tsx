@@ -8,7 +8,6 @@ import { MusicianCard } from '@/components/musicians/MusicianCard';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useMusiciansList } from '@/hooks/useDecentralizedList';
 import { useTrendingSongs } from '@/hooks/useTrending';
-import { useListCounts } from '@/hooks/useListCounts';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { APP_NAME, APP_TAGLINE, APP_DESCRIPTION } from '@/lib/constants';
 import { LoginArea } from '@/components/auth/LoginArea';
@@ -22,7 +21,6 @@ export default function Discover() {
   const { user } = useCurrentUser();
   const { songs, isLoading: loadingSongs } = useTrendingSongs();
   const { data: musicians, isLoading: loadingMusicians } = useMusiciansList();
-  const { data: counts } = useListCounts(); // Simple counts without scoring
   
   // Top 6 trending songs (already sorted by WoT score)
   const topSongs = songs?.slice(0, 6) || [];
@@ -69,11 +67,11 @@ export default function Discover() {
           {/* Stats */}
           <div className="flex justify-center gap-8 mt-12">
             <div className="text-center">
-              <div className="text-3xl font-bold gradient-text">{counts?.songs || 0}</div>
+              <div className="text-3xl font-bold gradient-text">10,000+</div>
               <div className="text-sm text-muted-foreground">Songs</div>
             </div>
             <div className="text-center">
-              <div className="text-3xl font-bold gradient-text">{counts?.musicians || 0}</div>
+              <div className="text-3xl font-bold gradient-text">1,000+</div>
               <div className="text-sm text-muted-foreground">Artists</div>
             </div>
             <div className="text-center">
