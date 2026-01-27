@@ -19,7 +19,10 @@ export default function Search() {
   const [searchQuery, setSearchQuery] = useState('');
   
   // Use direct relay search (not limited to loaded items)
-  const { songs: filteredSongs, musicians: filteredMusicians, isLoading } = useSearchCatalog(searchQuery);
+  const { data: searchResults, isLoading } = useSearchCatalog(searchQuery);
+  
+  const filteredSongs = searchResults?.songs || [];
+  const filteredMusicians = searchResults?.musicians || [];
   
   const hasResults = filteredSongs.length > 0 || filteredMusicians.length > 0;
   const showResults = searchQuery.trim().length > 0;

@@ -1,9 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { NRelay1, type NostrEvent } from '@nostrify/nostrify';
-import { useBatchTrustScores } from './useTrustScore';
-import { useCurrentUser } from './useCurrentUser';
 import { useHiddenItems } from './useHiddenItems';
-import { DCOSL_RELAY, KINDS, SONGS_LIST_A_TAG, MUSICIANS_LIST_A_TAG, TRUST_THRESHOLD, SYSTEM_CURATORS } from '@/lib/constants';
+import { DCOSL_RELAY, KINDS, SONGS_LIST_A_TAG, MUSICIANS_LIST_A_TAG } from '@/lib/constants';
 import { filterOutPodcasts } from '@/lib/filters';
 import { groupMusiciansByArtist } from '@/lib/musicianUtils';
 import type { ListItem, ScoredListItem } from '@/lib/types';
@@ -124,16 +122,16 @@ function calculateScores(
 }
 
 /**
- * Search the catalog by querying the relay directly (not limited to loaded items)
+ * Search the catalog by querying the relay directly
+ * Returns raw results without WoT filtering (search should show everything)
  */
 export function useSearchCatalog(searchQuery: string) {
-  const { user } = useCurrentUser();
   const { hiddenIds } = useHiddenItems();
   
-  const dataQuery = useQuery({
+  return useQuery({
     queryKey: ['searchCatalog', searchQuery],
-    queryFn: async () => {
-      if (!searchQuery.trim()) return { songs: [], musicians: [], reactions: new Map() };
+    queryFn: async (): Promise<{ songs: ScoredListItem[], musicians: ScoredListItem[] }> => {
+      if (!searchQuery.trim()) return { songs: [], musicians: [] };
       
       console.log('Searching catalog for:', searchQuery);
       
@@ -154,10 +152,11 @@ export function useSearchCatalog(searchQuery: string) {
           }]),
         ]);
         
+        // Parse and filter by hidden items
         const songs = songEvents.map(parseListItem).filter(item => !hiddenIds.includes(item.id));
         const musicians = musicianEvents.map(parseListItem).filter(item => !hiddenIds.includes(item.id));
         
-        // Filter by search query
+        // Filter by search query (client-side text matching)
         const query = searchQuery.toLowerCase();
         const matchingSongs = songs.filter(s =>
           s.songTitle?.toLowerCase().includes(query) ||
@@ -168,14 +167,34 @@ export function useSearchCatalog(searchQuery: string) {
           (m.musicianName || m.name || '').toLowerCase().includes(query)
         );
         
-        console.log(`Search results: ${matchingSongs.length} songs, ${matchingMusicians.length} musicians`);
+        console.log(`Search found: ${matchingSongs.length} songs, ${matchingMusicians.length} musicians`);
         
-        // Fetch reactions for matches only
-        const allMatches = [...matchingSongs, ...matchingMusicians];
-        const itemIds = allMatches.map(i => i.id);
-        const reactions = await fetchReactions(itemIds);
+        // Convert to ScoredListItem (with zero scores - search doesn't need WoT filtering)
+        const scoredSongs: ScoredListItem[] = matchingSongs.map(item => ({
+          ...item,
+          score: 0,
+          upvotes: 0,
+          downvotes: 0,
+          userReaction: null,
+        }));
         
-        return { songs: matchingSongs, musicians: matchingMusicians, reactions };
+        const scoredMusicians: ScoredListItem[] = matchingMusicians.map(item => ({
+          ...item,
+          score: 0,
+          upvotes: 0,
+          downvotes: 0,
+          userReaction: null,
+        }));
+        
+        // Filter podcasts from songs
+        const musicOnly = filterOutPodcasts(scoredSongs);
+        
+        // Group musicians by name
+        const grouped = groupMusiciansByArtist(scoredMusicians);
+        
+        console.log(`Returning: ${musicOnly.length} songs, ${grouped.length} musicians`);
+        
+        return { songs: musicOnly, musicians: grouped };
       } finally {
         await relay.close();
       }
@@ -183,40 +202,4 @@ export function useSearchCatalog(searchQuery: string) {
     enabled: searchQuery.trim().length > 0,
     staleTime: 2 * 60 * 1000,
   });
-  
-  // Get reactions from the data query (already fetched)
-  const reactions = dataQuery.data?.reactions || new Map();
-  
-  // Get reaction authors for trust scores
-  const allReactions = Array.from(reactions.values()).flat();
-  const reactionAuthors = Array.from(new Set(allReactions.map(r => r.pubkey)));
-  
-  const { data: trustScores, isLoading: loadingScores } = useBatchTrustScores(reactionAuthors);
-  
-  // Calculate scores (use empty map if trust scores not loaded yet)
-  const scoredSongs = dataQuery.data
-    ? calculateScores(dataQuery.data.songs, reactions, trustScores || new Map(), user?.pubkey)
-        .filter(item => item.score >= 0)
-    : [];
-  
-  const scoredMusicians = dataQuery.data
-    ? calculateScores(dataQuery.data.musicians, reactions, trustScores || new Map(), user?.pubkey)
-        .filter(item => item.score >= 0)
-    : [];
-  
-  console.log(`After scoring: ${scoredSongs.length} songs, ${scoredMusicians.length} musicians (trustScores: ${trustScores?.size || 0})`);
-  
-  // Filter podcasts from songs
-  const musicOnlySongs = filterOutPodcasts(scoredSongs);
-  
-  // Group musicians
-  const groupedMusicians = scoredMusicians.length > 0 ? groupMusiciansByArtist(scoredMusicians) : [];
-  
-  console.log(`Final results: ${musicOnlySongs.length} songs, ${groupedMusicians.length} grouped musicians`);
-  
-  return {
-    songs: musicOnlySongs,
-    musicians: groupedMusicians,
-    isLoading: dataQuery.isLoading || loadingScores,
-  };
 }
