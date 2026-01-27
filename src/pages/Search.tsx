@@ -7,9 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { SongCard } from '@/components/songs/SongCard';
 import { MusicianCard } from '@/components/musicians/MusicianCard';
-import { Skeleton } from '@/components/ui/skeleton';
-import { useSongsList, useMusiciansList } from '@/hooks/useDecentralizedList';
-import { groupMusiciansByArtist } from '@/lib/musicianUtils';
+import { useSearchCatalog } from '@/hooks/useSearchCatalog';
 import { APP_NAME } from '@/lib/constants';
 
 export default function Search() {
@@ -19,63 +17,9 @@ export default function Search() {
   });
   
   const [searchQuery, setSearchQuery] = useState('');
-  const { data: allSongs, isLoading: loadingSongs } = useSongsList();
-  const { data: allMusicians, isLoading: loadingMusicians } = useMusiciansList();
   
-  // Group musicians by artist name
-  const groupedMusicians = allMusicians ? groupMusiciansByArtist(allMusicians) : [];
-  
-  // Filter based on search query
-  const filteredSongs = useMemo(() => {
-    if (!searchQuery.trim() || !allSongs) return [];
-    
-    const query = searchQuery.toLowerCase();
-    return allSongs.filter(song => 
-      song.songTitle?.toLowerCase().includes(query) ||
-      song.songArtist?.toLowerCase().includes(query)
-    );
-  }, [searchQuery, allSongs]);
-  
-  const filteredMusicians = useMemo(() => {
-    if (!searchQuery.trim()) return [];
-    
-    const query = searchQuery.toLowerCase();
-    
-    // Filter musicians by name
-    const matchingMusicians = groupedMusicians.filter(musician =>
-      (musician.musicianName || musician.name || '').toLowerCase().includes(query)
-    );
-    
-    // Also check if any SONGS match this artist name (infer the artist exists)
-    const songsWithMatchingArtist = filteredSongs.filter(song =>
-      song.songArtist?.toLowerCase().includes(query)
-    );
-    
-    // Get unique artist names from matching songs
-    const artistsFromSongs = Array.from(
-      new Set(songsWithMatchingArtist.map(s => s.songArtist?.toLowerCase()))
-    ).filter(Boolean);
-    
-    // Create pseudo-musician entries for artists found in songs but not in musicians list
-    const inferredMusicians = artistsFromSongs
-      .filter(artistName => !matchingMusicians.some(m => 
-        (m.musicianName || m.name || '').toLowerCase() === artistName
-      ))
-      .map(artistName => {
-        // Find a song by this artist to get artwork
-        const sampleSong = songsWithMatchingArtist.find(s => s.songArtist?.toLowerCase() === artistName);
-        return {
-          id: `inferred-${artistName}`,
-          musicianName: sampleSong?.songArtist || '',
-          musicianArtwork: sampleSong?.songArtwork,
-          score: 0,
-          upvotes: 0,
-          downvotes: 0,
-        } as any;
-      });
-    
-    return [...matchingMusicians, ...inferredMusicians];
-  }, [searchQuery, groupedMusicians, filteredSongs]);
+  // Use direct relay search (not limited to loaded items)
+  const { songs: filteredSongs, musicians: filteredMusicians, isLoading } = useSearchCatalog(searchQuery);
   
   const hasResults = filteredSongs.length > 0 || filteredMusicians.length > 0;
   const showResults = searchQuery.trim().length > 0;
@@ -116,9 +60,9 @@ export default function Search() {
         </div>
         
         {/* Loading */}
-        {(loadingSongs || loadingMusicians) && !showResults && (
+        {isLoading && showResults && (
           <div className="text-center py-12">
-            <p className="text-muted-foreground">Loading catalog...</p>
+            <p className="text-muted-foreground">Searching...</p>
           </div>
         )}
         
