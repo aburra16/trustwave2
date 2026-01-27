@@ -4,8 +4,6 @@
 
 TrustWave is a Nostr-based music discovery application that replaces opaque algorithms with transparent social filtering. Music is sourced from Podcast Index RSS feeds, organized through decentralized lists on Nostr, and filtered through your personal Web-of-Trust network.
 
-[![Edit with Shakespeare](https://shakespeare.diy/badge.svg)](https://shakespeare.diy/clone?url=https%3A%2F%2Fgithub.com%2Faburra16%2Ftrustwave2)
-
 ## 🎯 Core Concept
 
 **The Problem:** Millions of independent V4V-enabled tracks exist on Podcast Index, but listeners can't find quality music because open repositories are noisy and disorganized.
@@ -488,9 +486,6 @@ Open http://localhost:5173
 - `wss://relay.damus.io` - General Nostr data
 - `wss://relay.primal.net` - General Nostr data
 
-**API Proxy:**
-- `https://trustwave-pi-proxy.malfactoryst.workers.dev` - Cloudflare Worker that proxies Podcast Index API (handles CORS + auth)
-
 **Supported Endpoints:**
 - `/search?q=<query>&medium=music` - Search for music feeds
 - `/episodes/byfeedid?id=<feedId>&max=<limit>` - Get episodes for a feed
@@ -813,8 +808,6 @@ export default function RecentlyPlayed() {
 
 ### Podcast Index API (via Proxy)
 
-**Base URL:** `https://trustwave-pi-proxy.malfactoryst.workers.dev`
-
 **Endpoints:**
 
 **Search Music:**
@@ -948,4 +941,3 @@ This project is built on open protocols and open source libraries. See individua
 
 ---
 
-*Vibed with [Shakespeare](https://shakespeare.diy) • Powered by Nostr • Music by Independent Artists*
