@@ -215,24 +215,13 @@ async function main() {
     const feed = feeds[i];
     console.log(`[${i + 1}/${feeds.length}] Processing: ${feed.author || feed.title}`);
     
-    // Create musician event
+    // Create musician event only (no episodes table in this DB)
     const musicianEvent = createMusicianEvent(feed);
     
-    // Get episodes for this feed
-    const episodes = db.prepare(`
-      SELECT id, guid, title, enclosureUrl, duration, image
-      FROM episodes
-      WHERE feedId = ?
-      LIMIT 1000
-    `).all(feed.id);
+    console.log(`  📀 Adding musician only (episodes will be fetched from API later)`);
     
-    console.log(`  📀 Found ${episodes.length} episodes`);
-    
-    // Create song events
-    const songEvents = episodes.map(ep => createSongEvent(ep, feed));
-    
-    // Combine all events for this artist
-    const allEvents = [musicianEvent, ...songEvents];
+    // Just the musician event
+    const allEvents = [musicianEvent];
     
     // Publish in batches
     for (let j = 0; j < allEvents.length; j += BATCH_SIZE) {
