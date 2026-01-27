@@ -193,18 +193,18 @@ export function useSearchCatalog(searchQuery: string) {
   
   const { data: trustScores, isLoading: loadingScores } = useBatchTrustScores(reactionAuthors);
   
-  // Calculate scores (wait for trust scores)
-  const scoredSongs = dataQuery.data && trustScores
-    ? calculateScores(dataQuery.data.songs, reactions, trustScores, user?.pubkey)
+  // Calculate scores (use empty map if trust scores not loaded yet)
+  const scoredSongs = dataQuery.data
+    ? calculateScores(dataQuery.data.songs, reactions, trustScores || new Map(), user?.pubkey)
         .filter(item => item.score >= 0)
-    : dataQuery.data?.songs || [];
+    : [];
   
-  const scoredMusicians = dataQuery.data && trustScores
-    ? calculateScores(dataQuery.data.musicians, reactions, trustScores, user?.pubkey)
+  const scoredMusicians = dataQuery.data
+    ? calculateScores(dataQuery.data.musicians, reactions, trustScores || new Map(), user?.pubkey)
         .filter(item => item.score >= 0)
-    : dataQuery.data?.musicians || [];
+    : [];
   
-  console.log(`After scoring: ${scoredSongs.length} songs, ${scoredMusicians.length} musicians`);
+  console.log(`After scoring: ${scoredSongs.length} songs, ${scoredMusicians.length} musicians (trustScores: ${trustScores?.size || 0})`);
   
   // Filter podcasts from songs
   const musicOnlySongs = filterOutPodcasts(scoredSongs);
