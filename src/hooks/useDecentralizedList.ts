@@ -231,12 +231,33 @@ export function useSongsList() {
   
   // First, fetch items and reactions without trust scores
   const itemsQuery = useQuery({
-    queryKey: ['nostr', 'songsListItems', hiddenIds.length],
+    queryKey: ['nostr', 'songsListItems', hiddenIds.length, user?.pubkey],
     queryFn: async () => {
       console.log('useSongsList: Fetching songs...');
       
-      const items = await fetchListItems(SONGS_LIST_A_TAG, 1000); // Limit to 1000 for performance
+      let items = await fetchListItems(SONGS_LIST_A_TAG, 1000); // Limit to 1000 for performance
       console.log(`useSongsList: Found ${items.length} items`);
+      
+      // If user is logged in, also fetch THEIR songs specifically
+      if (user?.pubkey) {
+        const relay = new NRelay1(DCOSL_RELAY);
+        try {
+          const userSongs = await relay.query([{
+            kinds: [KINDS.LIST_ITEM, KINDS.LIST_ITEM_REPLACEABLE],
+            '#z': [SONGS_LIST_A_TAG],
+            authors: [user.pubkey],
+            limit: 500,
+          }]);
+          
+          const existingIds = new Set(items.map(e => e.id));
+          const newUserSongs = userSongs.filter(e => !existingIds.has(e.id));
+          items = [...newUserSongs.map(parseListItem), ...items.slice(0, 900)];
+          
+          console.log(`Added ${newUserSongs.length} of user's songs to the list`);
+        } finally {
+          await relay.close();
+        }
+      }
       
       if (items.length === 0) return { items: [], reactions: new Map() };
       
