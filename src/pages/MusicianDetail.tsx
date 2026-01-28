@@ -7,7 +7,8 @@ import { SongCard } from '@/components/songs/SongCard';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useMusicianByGuid } from '@/hooks/useMusicianByGuid';
 import { useSongsByMusician } from '@/hooks/useSongsByMusician';
-import { usePodcastIndexSearch, usePodcastIndexEpisodes } from '@/hooks/usePodcastIndex';
+import { usePodcastIndexSearch } from '@/hooks/usePodcastIndex';
+import { useMultipleFeedEpisodes } from '@/hooks/useMultipleFeedEpisodes';
 import { usePublishReaction } from '@/hooks/useReaction';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { cn } from '@/lib/utils';
@@ -55,19 +56,11 @@ export default function MusicianDetail() {
   
   // STEP 5: API FALLBACK - If no songs on relay, fetch from Podcast Index for ALL albums
   const needsApiFallback = !loadingRelaySongs && relaySongs.length === 0;
-  const allFeedIds = allMusicianEntries.map(m => m.feedId).filter(Boolean);
+  const allFeedIds = allMusicianEntries.map(m => m.feedId).filter(Boolean) as string[];
   
-  console.log(`API FALLBACK: ${needsApiFallback ? 'enabled' : 'disabled'}, fetching for ${allFeedIds.length} feed IDs`);
+  const { data: apiEpisodes } = useMultipleFeedEpisodes(allFeedIds, needsApiFallback);
   
-  // Fetch episodes for each feed ID
-  const episodeQueries = allFeedIds.map(feedId => ({
-    feedId,
-    query: usePodcastIndexEpisodes(feedId, needsApiFallback),
-  }));
-  
-  const allApiEpisodes = episodeQueries.flatMap(q => q.query.data || []);
-  
-  console.log(`API FALLBACK: Found ${allApiEpisodes.length} total episodes across ${allFeedIds.length} albums`);
+  console.log(`API FALLBACK: ${needsApiFallback ? 'enabled' : 'disabled'}, found ${apiEpisodes?.length || 0} episodes from ${allFeedIds.length} albums`);
   
   // Convert API episodes to preview format
   const apiPreviewSongs: ScoredListItem[] = allApiEpisodes.map(ep => ({
