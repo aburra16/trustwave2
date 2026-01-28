@@ -6,18 +6,19 @@ import { DCOSL_RELAY, KINDS, MUSICIANS_LIST_A_TAG, TRUST_THRESHOLD, SYSTEM_CURAT
 import type { ScoredListItem } from '@/lib/types';
 
 /**
- * Fetch a specific musician by their feed GUID (on-demand)
+ * Fetch musician(s) by their feed GUID(s) - can accept multiple GUIDs
  * Used when musician isn't in the loaded list
  */
-export function useMusicianByGuid(guid: string | undefined) {
+export function useMusicianByGuid(guids: string | string[] | undefined) {
+  const guidArray = Array.isArray(guids) ? guids : guids ? [guids] : [];
   const { user } = useCurrentUser();
   
   const dataQuery = useQuery({
-    queryKey: ['musicianByGuid', guid],
+    queryKey: ['musicianByGuid', guidArray.join(',')],
     queryFn: async () => {
-      if (!guid) return null;
+      if (guidArray.length === 0) return null;
       
-      console.log('Fetching musician by GUID:', guid);
+      console.log('Fetching musicians by GUIDs:', guidArray);
       
       const relay = new NRelay1(DCOSL_RELAY);
       
@@ -25,11 +26,11 @@ export function useMusicianByGuid(guid: string | undefined) {
         const events = await relay.query([{
           kinds: [KINDS.LIST_ITEM, KINDS.LIST_ITEM_REPLACEABLE],
           '#z': [MUSICIANS_LIST_A_TAG],
-          '#t': [guid], // Exact GUID lookup
-          limit: 10, // Artist might have multiple releases
+          '#t': guidArray, // Exact GUID lookup (can be multiple)
+          limit: 50, // Multiple albums × multiple entries
         }]);
         
-        console.log(`Found ${events.length} musician events for GUID ${guid}`);
+        console.log(`Found ${events.length} musician events for ${guidArray.length} GUIDs`);
         
         if (events.length === 0) return null;
         
@@ -75,7 +76,7 @@ export function useMusicianByGuid(guid: string | undefined) {
         await relay.close();
       }
     },
-    enabled: !!guid,
+    enabled: guidArray.length > 0,
     staleTime: 5 * 60 * 1000,
   });
   

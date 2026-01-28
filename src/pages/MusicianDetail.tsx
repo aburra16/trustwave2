@@ -7,7 +7,7 @@ import { SongCard } from '@/components/songs/SongCard';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useMusicianByGuid } from '@/hooks/useMusicianByGuid';
 import { useSongsByMusician } from '@/hooks/useSongsByMusician';
-import { usePodcastIndexEpisodes } from '@/hooks/usePodcastIndex';
+import { usePodcastIndexSearch } from '@/hooks/usePodcastIndex';
 import { usePublishReaction } from '@/hooks/useReaction';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { cn } from '@/lib/utils';
@@ -20,58 +20,44 @@ export default function MusicianDetail() {
   
   console.log('MusicianDetail: Loading musician with GUID:', guid);
   
-  // Fetch musician(s) by GUID (on-demand, works even if not in loaded list)
-  const { musicians: artistEntries, isLoading: loadingMusicians } = useMusicianByGuid(guid);
+// STEP 1: SEED - Fetch the initial musician by GUID (from URL)
+  const { musicians: seedMusicians, isLoading: loadingSeed } = useMusicianByGuid(guid);
   
-const artistName = artistEntries[0]?.musicianName || artistEntries[0]?.name || 'Unknown Artist';
-  const feedId = artistEntries[0]?.feedId;
-  const artistArtwork = artistEntries[0]?.musicianArtwork;
-  const musicianEventIds = artistEntries.map(e => e.id);
+  const artistName = seedMusicians[0]?.musicianName || seedMusicians[0]?.name || 'Unknown Artist';
+  const artistArtwork = seedMusicians[0]?.musicianArtwork;
   
-  console.log('Fetching songs for musician event IDs:', musicianEventIds);
+  console.log('SEED musician loaded:', artistName);
   
-  // PRIMARY: Fetch songs from relay using parent musician event ID
-  const { songs: relaySongs, isLoading: loadingRelaySongs } = useSongsByMusician(undefined, musicianEventIds);
+  // STEP 2: EXPAND - Search Podcast Index API for ALL albums by this artist
+  const { data: apiSearchResults, isLoading: loadingApiSearch } = usePodcastIndexSearch(
+    artistName,
+    !loadingSeed && !!artistName && artistName !== 'Unknown Artist'
+  );
   
-  console.log(`Found ${relaySongs.length} songs on relay`);
+  // Extract all GUIDs for this artist
+  const allArtistGuids = apiSearchResults?.map(feed => feed.podcastGuid).filter(Boolean) || [];
+  console.log(`EXPAND: Found ${allArtistGuids.length} total albums for "${artistName}" via API`);
   
-  // SECONDARY: Fetch from API if relay has no songs (fallback/preview)
-  const needsApiFallback = !loadingRelaySongs && relaySongs.length === 0;
-  const { data: apiEpisodes, isLoading: loadingApiEpisodes } = usePodcastIndexEpisodes(feedId, needsApiFallback);
+  // STEP 3: CLUSTER - Fetch musician events for ALL discovered GUIDs
+  const { musicians: allMusicianEntries, isLoading: loadingAllMusicians } = useMusicianByGuid(
+    allArtistGuids.length > 0 ? allArtistGuids : guid
+  );
   
-  console.log(`API fallback: ${needsApiFallback ? 'enabled' : 'disabled'}, found ${apiEpisodes?.length || 0} episodes`);
+  console.log(`CLUSTER: Found ${allMusicianEntries.length} musician entries on relay`);
   
-  // Convert API episodes to preview format (can be imported)
-  const apiPreviewSongs: ScoredListItem[] = apiEpisodes?.map(ep => ({
-    id: `api-preview-${ep.guid}`,
-    pubkey: '',
-    listATag: '',
-    songGuid: ep.guid,
-    songTitle: ep.title,
-    songArtist: artistName,
-    songUrl: ep.enclosureUrl,
-    songArtwork: ep.image || ep.feedImage || artistArtwork,
-    songDuration: ep.duration,
-    feedId: String(ep.feedId),
-    feedGuid: ep.podcastGuid,
-    createdAt: ep.datePublished,
-    event: {} as any,
-    score: 0,
-    upvotes: 0,
-    downvotes: 0,
-    userReaction: null,
-    isApiPreview: true, // Flag for UI rendering
-  } as any)) || [];
+  // Get all musician event IDs (for querying songs)
+  const allMusicianEventIds = allMusicianEntries.map(m => m.id);
   
-  // Deduplicate: Filter out API previews that already exist on relay
-  const relayGuids = new Set(relaySongs.map(s => s.songGuid));
-  const uniquePreviews = apiPreviewSongs.filter(s => !relayGuids.has(s.songGuid));
+  // STEP 4: FETCH SONGS - Get songs for ALL musician events
+  const { songs: relaySongs, isLoading: loadingRelaySongs } = useSongsByMusician(undefined, allMusicianEventIds);
   
-  // Combine: Verified relay songs first, then API previews
-  const artistSongs = [...relaySongs, ...uniquePreviews];
-  const loadingSongs = loadingRelaySongs;
+  console.log(`Found ${relaySongs.length} songs on relay for ${artistName}`);
   
-  console.log(`Total songs: ${artistSongs.length} (${relaySongs.length} on relay, ${uniquePreviews.length} API previews)`);
+  // Combine all data
+  const artistEntries = allMusicianEntries;
+  const artistSongs = relaySongs;
+  const loadingSongs = loadingRelaySongs || loadingApiSearch || loadingAllMusicians;
+  const loadingMusicians = loadingSeed || loadingAllMusicians;
   
   // Use the primary entry (highest score) for metadata
   // If no musician entries, infer from songs
