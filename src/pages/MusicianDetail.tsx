@@ -63,7 +63,7 @@ export default function MusicianDetail() {
   console.log(`API FALLBACK: ${needsApiFallback ? 'enabled' : 'disabled'}, found ${apiEpisodes?.length || 0} episodes from ${allFeedIds.length} albums`);
   
   // Convert API episodes to preview format
-  const apiPreviewSongs: ScoredListItem[] = allApiEpisodes.map(ep => ({
+  const apiPreviewSongs: ScoredListItem[] = (apiEpisodes || []).map(ep => ({
     id: `api-preview-${ep.guid}`,
     pubkey: '',
     listATag: '',
