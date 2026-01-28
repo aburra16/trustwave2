@@ -7,7 +7,7 @@ import { SongCard } from '@/components/songs/SongCard';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useMusicianByGuid } from '@/hooks/useMusicianByGuid';
 import { useSongsByMusician } from '@/hooks/useSongsByMusician';
-import { usePodcastIndexSearch } from '@/hooks/usePodcastIndex';
+import { usePodcastIndexSearch, usePodcastIndexEpisodes } from '@/hooks/usePodcastIndex';
 import { usePublishReaction } from '@/hooks/useReaction';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { cn } from '@/lib/utils';
@@ -53,11 +53,47 @@ export default function MusicianDetail() {
   
   console.log(`Found ${relaySongs.length} songs on relay for ${artistName}`);
   
+  // STEP 5: API FALLBACK - If no songs on relay, fetch from Podcast Index as preview
+  const needsApiFallback = !loadingRelaySongs && relaySongs.length === 0;
+  const firstFeedId = allMusicianEntries[0]?.feedId;
+  
+  const { data: apiEpisodes } = usePodcastIndexEpisodes(firstFeedId, needsApiFallback);
+  
+  console.log(`API FALLBACK: ${needsApiFallback ? 'enabled' : 'disabled'}, found ${apiEpisodes?.length || 0} episodes`);
+  
+  // Convert API episodes to preview format
+  const apiPreviewSongs: ScoredListItem[] = apiEpisodes?.map(ep => ({
+    id: `api-preview-${ep.guid}`,
+    pubkey: '',
+    listATag: '',
+    songGuid: ep.guid,
+    songTitle: ep.title,
+    songArtist: artistName,
+    songUrl: ep.enclosureUrl,
+    songArtwork: ep.image || ep.feedImage || allMusicianEntries[0]?.musicianArtwork,
+    songDuration: ep.duration,
+    feedId: String(ep.feedId),
+    feedGuid: ep.podcastGuid,
+    createdAt: ep.datePublished,
+    event: {} as any,
+    score: 0,
+    upvotes: 0,
+    downvotes: 0,
+    userReaction: null,
+    isApiPreview: true,
+  } as any)) || [];
+  
+  // Deduplicate
+  const relayGuids = new Set(relaySongs.map(s => s.songGuid));
+  const uniquePreviews = apiPreviewSongs.filter(s => !relayGuids.has(s.songGuid));
+  
   // Combine all data
   const artistEntries = allMusicianEntries;
-  const artistSongs = relaySongs;
+  const artistSongs = [...relaySongs, ...uniquePreviews];
   const loadingSongs = loadingRelaySongs || loadingApiSearch || loadingAllMusicians;
   const loadingMusicians = loadingSeed || loadingAllMusicians;
+  
+  console.log(`FINAL: ${artistSongs.length} total songs (${relaySongs.length} relay, ${uniquePreviews.length} API preview)`);
   
   // Use the primary entry (highest score) for metadata
   // If no musician entries, infer from songs
