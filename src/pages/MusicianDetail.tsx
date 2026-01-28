@@ -63,6 +63,7 @@ export default function MusicianDetail() {
   console.log(`API FALLBACK: ${needsApiFallback ? 'enabled' : 'disabled'}, found ${apiEpisodes?.length || 0} episodes from ${allFeedIds.length} albums`);
   
   // Convert API episodes to preview format
+  // Store musician event ID so import can link to parent
   const apiPreviewSongs: ScoredListItem[] = (apiEpisodes || []).map(ep => ({
     id: `api-preview-${ep.guid}`,
     pubkey: '',
@@ -76,12 +77,13 @@ export default function MusicianDetail() {
     feedId: String(ep.feedId),
     feedGuid: ep.podcastGuid,
     createdAt: ep.datePublished,
-    event: {} as any,
+    event: { id: allMusicianEntries[0]?.id } as any, // Store musician event ID for import
     score: 0,
     upvotes: 0,
     downvotes: 0,
     userReaction: null,
     isApiPreview: true,
+    musicianEventId: allMusicianEntries[0]?.id, // For import linking
   } as any));
   
   // Deduplicate

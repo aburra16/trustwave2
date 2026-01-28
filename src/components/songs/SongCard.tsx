@@ -91,12 +91,15 @@ export function SongCard({ song, index = 0, queue = [], variant = 'default' }: S
       artwork: song.songArtwork || '',
     } as any;
     
-    addSong({ episode, feed }, {
+    addSong({ episode, feed, musicianEventId: (song as any).musicianEventId }, {
       onSuccess: () => {
         toast({
           title: 'Song Imported!',
-          description: `${song.songTitle} has been added to TrustWave with proper tags.`,
+          description: `${song.songTitle} has been added to TrustWave. Refresh to see it.`,
         });
+        
+        // Note: Page refresh needed to see the song move from preview to relay
+        // The queries are complex and auto-refetch might not catch the new structure
       },
       onError: (error) => {
         toast({
