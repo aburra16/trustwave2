@@ -54,13 +54,13 @@ export default function MusicianDetail() {
   
   console.log(`Found ${relaySongs.length} songs on relay for ${artistName}`);
   
-  // STEP 5: API FALLBACK - If no songs on relay, fetch from Podcast Index for ALL albums
-  const needsApiFallback = !loadingRelaySongs && relaySongs.length === 0;
+  // STEP 5: API PREVIEW - Always fetch from Podcast Index to show complete catalog
+  // (Songs not yet on relay will show as preview with Import buttons)
   const allFeedIds = allMusicianEntries.map(m => m.feedId).filter(Boolean) as string[];
   
-  const { data: apiEpisodes } = useMultipleFeedEpisodes(allFeedIds, needsApiFallback);
+  const { data: apiEpisodes } = useMultipleFeedEpisodes(allFeedIds, allFeedIds.length > 0);
   
-  console.log(`API FALLBACK: ${needsApiFallback ? 'enabled' : 'disabled'}, found ${apiEpisodes?.length || 0} episodes from ${allFeedIds.length} albums`);
+  console.log(`API PREVIEW: Found ${apiEpisodes?.length || 0} episodes from ${allFeedIds.length} albums`);
   
   // Convert API episodes to preview format
   // Store musician event ID so import can link to parent
