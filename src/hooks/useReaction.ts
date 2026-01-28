@@ -37,6 +37,7 @@ export function usePublishReaction() {
       // Cancel any outgoing refetches
       await queryClient.cancelQueries({ queryKey: ['nostr', 'songsList'] });
       await queryClient.cancelQueries({ queryKey: ['nostr', 'musiciansList'] });
+      await queryClient.cancelQueries({ queryKey: ['songsByMusician'] });
       
       // Get current data
       const previousSongs = queryClient.getQueryData(['nostr', 'songsList']);
@@ -93,6 +94,34 @@ export function usePublishReaction() {
             userReaction: reaction,
           };
         });
+      });
+      
+      // Update songsByMusician queries (for musician detail pages)
+      queryClient.setQueriesData({ queryKey: ['songsByMusician'] }, (old: any) => {
+        if (!old?.songs) return old;
+        return {
+          ...old,
+          songs: old.songs.map((item: any) => {
+            if (item.id !== targetEventId) return item;
+            
+            let upvotes = item.upvotes;
+            let downvotes = item.downvotes;
+            
+            if (currentReaction === '+') upvotes--;
+            if (currentReaction === '-') downvotes--;
+            
+            if (reaction === '+') upvotes++;
+            if (reaction === '-') downvotes++;
+            
+            return {
+              ...item,
+              upvotes,
+              downvotes,
+              score: upvotes - downvotes,
+              userReaction: reaction,
+            };
+          }),
+        };
       });
       
       // Return context for rollback
