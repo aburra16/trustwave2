@@ -9,6 +9,7 @@ interface AddSongParams {
   feed: PodcastIndexFeed;
   listATag?: string; // Optional: add to a specific sublist instead of master
   annotation?: string;
+  musicianEventId?: string; // Parent musician event ID (for 'e' tag)
 }
 
 interface AddMusicianParams {
@@ -37,13 +38,14 @@ export function useAddSong() {
         throw new Error('You must be logged in to add songs');
       }
       
-      const { episode, feed, listATag, annotation } = params;
+      const { episode, feed, listATag, annotation, musicianEventId } = params;
       const targetList = listATag || SONGS_LIST_A_TAG;
       
-      // Build tags
+      // Build tags (match backend import script structure)
       const tags: string[][] = [
         ['z', targetList],
-        ['t', episode.guid],
+        ['medium', 'music'], // Quality stamp
+        ['t', episode.guid], // Episode GUID
         ['title', episode.title],
         ['artist', feed.author || feed.title],
         ['url', episode.enclosureUrl],
@@ -51,6 +53,16 @@ export function useAddSong() {
         ['feedId', String(feed.id)],
         ['feedGuid', feed.podcastGuid || ''],
       ];
+      
+      // Add parent musician link (if available)
+      if (musicianEventId) {
+        tags.push(['e', musicianEventId]); // Queryable parent link
+      }
+      
+      // Add feed GUID as single-letter tag (queryable)
+      if (feed.podcastGuid) {
+        tags.push(['g', feed.podcastGuid]);
+      }
       
       // Add artwork if available
       if (episode.image || episode.feedImage || feed.artwork) {
@@ -174,10 +186,11 @@ export function useAddMusician() {
               
               console.log(`Auto-adding ${episodes.length} songs...`);
               
-              // Add each episode as a song
+              // Add each episode as a song (with proper queryable tags)
               for (const episode of episodes) {
                 const songTags: string[][] = [
                   ['z', SONGS_LIST_A_TAG],
+                  ['medium', 'music'], // Quality stamp
                   ['t', episode.guid],
                   ['title', episode.title],
                   ['artist', feed.author || feed.title],
@@ -185,6 +198,8 @@ export function useAddMusician() {
                   ['duration', String(episode.duration || 0)],
                   ['feedId', String(feed.id)],
                   ['feedGuid', feed.podcastGuid || ''],
+                  ['e', musicianEvent.id], // Link to parent musician (queryable!)
+                  ['g', feed.podcastGuid || ''], // Feed GUID (queryable!)
                 ];
                 
                 if (episode.image || episode.feedImage || feed.artwork) {
