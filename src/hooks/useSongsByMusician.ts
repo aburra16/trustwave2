@@ -28,28 +28,33 @@ export function useSongsByMusician(feedGuid: string | undefined, musicianEventId
       try {
         const queries = [];
         
-        // Strategy 1: Query by feed GUID (new structure)
+        // Strategy 1: Query by feed GUID (new songs with 'g' tag)
         if (feedGuid) {
+          console.log('Querying by #g tag:', feedGuid);
           queries.push(relay.query([{
             kinds: [KINDS.LIST_ITEM, KINDS.LIST_ITEM_REPLACEABLE],
             '#z': [SONGS_LIST_A_TAG],
-            '#g': [feedGuid], // Query by feed GUID (single-letter tag, indexed!)
+            '#g': [feedGuid],
             limit: 500,
           }]));
         }
         
-        // Strategy 2: Query by musician event ID (for older songs)
+        // Strategy 2: Query by musician event ID (new songs with 'e' tag)
         if (musicianEventIds.length > 0) {
+          console.log('Querying by #e tag:', musicianEventIds.length, 'event IDs');
           queries.push(relay.query([{
             kinds: [KINDS.LIST_ITEM, KINDS.LIST_ITEM_REPLACEABLE],
             '#z': [SONGS_LIST_A_TAG],
-            '#e': musicianEventIds, // Query by parent musician event
+            '#e': musicianEventIds,
             limit: 500,
           }]));
         }
         
         const results = await Promise.all(queries);
+        console.log('Query results:', results.map(r => r.length));
+        
         const allEvents = results.flat();
+        console.log(`Total events before dedup: ${allEvents.length}`);
         
         // Deduplicate by event ID
         const uniqueEvents = Array.from(
