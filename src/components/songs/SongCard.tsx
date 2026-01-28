@@ -70,11 +70,41 @@ export function SongCard({ song, index = 0, queue = [], variant = 'default' }: S
       return;
     }
     
-    // We need the feed and episode data to import
-    // For now, show a message (we'd need to restructure to have full episode data)
-    toast({
-      title: 'Import Feature',
-      description: 'Importing individual songs coming soon!',
+    // For API preview songs, we need to reconstruct the episode and feed objects
+    const episode = {
+      guid: song.songGuid || '',
+      title: song.songTitle || '',
+      enclosureUrl: song.songUrl || '',
+      duration: song.songDuration || 0,
+      image: song.songArtwork || '',
+      feedImage: song.songArtwork || '',
+      feedId: parseInt(song.feedId || '0'),
+      podcastGuid: song.feedGuid,
+      datePublished: song.createdAt || 0,
+    } as any;
+    
+    const feed = {
+      id: parseInt(song.feedId || '0'),
+      podcastGuid: song.feedGuid || '',
+      author: song.songArtist || '',
+      title: song.songArtist || '',
+      artwork: song.songArtwork || '',
+    } as any;
+    
+    addSong({ episode, feed }, {
+      onSuccess: () => {
+        toast({
+          title: 'Song Imported!',
+          description: `${song.songTitle} has been added to TrustWave with proper tags.`,
+        });
+      },
+      onError: (error) => {
+        toast({
+          title: 'Import Failed',
+          description: error.message,
+          variant: 'destructive',
+        });
+      },
     });
   };
   
