@@ -167,9 +167,9 @@ console.log('MusicianDetail:', {
       <div className="container mx-auto px-4 py-8">
         {/* Back Button */}
         <Button variant="ghost" className="mb-6" asChild>
-          <Link to="/musicians">
+          <Link to="/search">
             <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Musicians
+            Back to Search
           </Link>
         </Button>
         
