@@ -26,10 +26,10 @@ const RELAY_URL = 'wss://dcosl.brainstorm.world';
 const API_PROXY = 'https://trustwave-pi-proxy.malfactoryst.workers.dev';
 const SONGS_LIST_A_TAG = '39998:b83a28b7e4e5d20bd960c5faeb6625f95529166b8bdb045d42634a2f35919450:17c49d8b-c0d9-49bf-875f-6c7568f45f38';
 
-// Rate limiting
-const API_DELAY_MS = 1000; // 1 second between API calls (3,600/hour)
-const BATCH_SIZE = 100; // Publish 100 songs at a time
-const BATCH_DELAY_MS = 500; // 500ms between batches
+// Rate limiting (CONSERVATIVE - prevents relay timeouts)
+const API_DELAY_MS = 1000; // 1 second between API calls
+const BATCH_SIZE = 10; // Publish 10 songs at a time (gentle on relay)
+const BATCH_DELAY_MS = 3000; // 3 seconds between batches (prevent overload)
 
 // Test mode
 const IS_TEST = process.argv.includes('--test');
