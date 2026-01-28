@@ -53,16 +53,24 @@ export default function MusicianDetail() {
   
   console.log(`Found ${relaySongs.length} songs on relay for ${artistName}`);
   
-  // STEP 5: API FALLBACK - If no songs on relay, fetch from Podcast Index as preview
+  // STEP 5: API FALLBACK - If no songs on relay, fetch from Podcast Index for ALL albums
   const needsApiFallback = !loadingRelaySongs && relaySongs.length === 0;
-  const firstFeedId = allMusicianEntries[0]?.feedId;
+  const allFeedIds = allMusicianEntries.map(m => m.feedId).filter(Boolean);
   
-  const { data: apiEpisodes } = usePodcastIndexEpisodes(firstFeedId, needsApiFallback);
+  console.log(`API FALLBACK: ${needsApiFallback ? 'enabled' : 'disabled'}, fetching for ${allFeedIds.length} feed IDs`);
   
-  console.log(`API FALLBACK: ${needsApiFallback ? 'enabled' : 'disabled'}, found ${apiEpisodes?.length || 0} episodes`);
+  // Fetch episodes for each feed ID
+  const episodeQueries = allFeedIds.map(feedId => ({
+    feedId,
+    query: usePodcastIndexEpisodes(feedId, needsApiFallback),
+  }));
+  
+  const allApiEpisodes = episodeQueries.flatMap(q => q.query.data || []);
+  
+  console.log(`API FALLBACK: Found ${allApiEpisodes.length} total episodes across ${allFeedIds.length} albums`);
   
   // Convert API episodes to preview format
-  const apiPreviewSongs: ScoredListItem[] = apiEpisodes?.map(ep => ({
+  const apiPreviewSongs: ScoredListItem[] = allApiEpisodes.map(ep => ({
     id: `api-preview-${ep.guid}`,
     pubkey: '',
     listATag: '',
@@ -81,7 +89,7 @@ export default function MusicianDetail() {
     downvotes: 0,
     userReaction: null,
     isApiPreview: true,
-  } as any)) || [];
+  } as any));
   
   // Deduplicate
   const relayGuids = new Set(relaySongs.map(s => s.songGuid));
