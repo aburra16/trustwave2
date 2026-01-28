@@ -63,8 +63,15 @@ const artistName = artistEntries[0]?.musicianName || artistEntries[0]?.name || '
     isApiPreview: true, // Flag for UI rendering
   } as any)) || [];
   
-  const artistSongs = relaySongs; // Only show relay songs (votable)
+  // Deduplicate: Filter out API previews that already exist on relay
+  const relayGuids = new Set(relaySongs.map(s => s.songGuid));
+  const uniquePreviews = apiPreviewSongs.filter(s => !relayGuids.has(s.songGuid));
+  
+  // Combine: Verified relay songs first, then API previews
+  const artistSongs = [...relaySongs, ...uniquePreviews];
   const loadingSongs = loadingRelaySongs;
+  
+  console.log(`Total songs: ${artistSongs.length} (${relaySongs.length} on relay, ${uniquePreviews.length} API previews)`);
   
   // Use the primary entry (highest score) for metadata
   // If no musician entries, infer from songs

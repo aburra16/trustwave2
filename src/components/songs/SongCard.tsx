@@ -1,4 +1,4 @@
-import { Play, Pause, ThumbsUp, ThumbsDown, MoreHorizontal, Plus } from 'lucide-react';
+import { Play, Pause, ThumbsUp, ThumbsDown, MoreHorizontal, Plus, Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import {
@@ -9,7 +9,9 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { usePlayer } from '@/contexts/PlayerContext';
 import { usePublishReaction } from '@/hooks/useReaction';
+import { useAddSong } from '@/hooks/useCurator';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
+import { useToast } from '@/hooks/useToast';
 import { VotersList } from './VotersList';
 import { KINDS } from '@/lib/constants';
 import type { ScoredListItem } from '@/lib/types';
@@ -31,13 +33,16 @@ function formatDuration(seconds: number | undefined): string {
 export function SongCard({ song, index = 0, queue = [], variant = 'default' }: SongCardProps) {
   const { state, playTrack } = usePlayer();
   const { user } = useCurrentUser();
+  const { toast } = useToast();
   const { mutate: publishReaction, isPending: isReacting } = usePublishReaction();
+  const { mutate: addSong, isPending: isImporting } = useAddSong();
   
   const isCurrentTrack = state.currentTrack?.id === song.id;
   const isPlaying = isCurrentTrack && state.isPlaying;
   
-  // Check if this is a real Nostr event (can be voted on) or just a Podcast Index episode
-  const isNostrEvent = song.event?.id && !song.id.startsWith('episode-');
+  // Check if this is a real Nostr event or an API preview
+  const isApiPreview = (song as any).isApiPreview === true;
+  const isNostrEvent = !isApiPreview && song.event?.id && !song.id.startsWith('episode-') && !song.id.startsWith('api-');
   
   const handlePlay = () => {
     playTrack(song, queue.length > 0 ? queue : [song], index);
@@ -46,19 +51,30 @@ export function SongCard({ song, index = 0, queue = [], variant = 'default' }: S
   const handleReaction = (reaction: '+' | '-') => {
     if (!user || !isNostrEvent) return;
     
-    console.log('SongCard reaction params:', {
-      targetEventId: song.id,
-      targetPubkey: song.pubkey,
-      targetKind: song.event.kind || KINDS.LIST_ITEM,
-      songEventKind: song.event?.kind,
-    });
-    
     publishReaction({
       targetEventId: song.id,
       targetPubkey: song.pubkey,
       targetKind: song.event.kind || KINDS.LIST_ITEM,
       reaction,
       currentReaction: song.userReaction,
+    });
+  };
+  
+  const handleImportSong = () => {
+    if (!user) {
+      toast({
+        title: 'Login Required',
+        description: 'Please log in to import songs.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    
+    // We need the feed and episode data to import
+    // For now, show a message (we'd need to restructure to have full episode data)
+    toast({
+      title: 'Import Feature',
+      description: 'Importing individual songs coming soon!',
     });
   };
   
@@ -261,33 +277,50 @@ export function SongCard({ song, index = 0, queue = [], variant = 'default' }: S
         )}
       </div>
       
-      {/* Action Buttons - only show if this is a real Nostr event */}
-      {user && isNostrEvent && (
+      {/* Action Buttons */}
+      {user && (
         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8"
-            onClick={() => handleReaction('+')}
-            disabled={isReacting}
-          >
-            <ThumbsUp className={cn(
-              'w-4 h-4',
-              song.userReaction === '+' && 'fill-current text-tw-success'
-            )} />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8"
-            onClick={() => handleReaction('-')}
-            disabled={isReacting}
-          >
-            <ThumbsDown className={cn(
-              'w-4 h-4',
-              song.userReaction === '-' && 'fill-current text-destructive'
-            )} />
-          </Button>
+          {isNostrEvent ? (
+            // Voting buttons for relay songs
+            <>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => handleReaction('+')}
+                disabled={isReacting}
+              >
+                <ThumbsUp className={cn(
+                  'w-4 h-4',
+                  song.userReaction === '+' && 'fill-current text-tw-success'
+                )} />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => handleReaction('-')}
+                disabled={isReacting}
+              >
+                <ThumbsDown className={cn(
+                  'w-4 h-4',
+                  song.userReaction === '-' && 'fill-current text-destructive'
+                )} />
+              </Button>
+            </>
+          ) : isApiPreview ? (
+            // Import button for API preview songs
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 gap-1.5 border-tw-cyan text-tw-cyan hover:bg-tw-cyan/10"
+              onClick={handleImportSong}
+              disabled={isImporting}
+            >
+              <Zap className="w-3 h-3" />
+              Import
+            </Button>
+          ) : null}
         </div>
       )}
       
