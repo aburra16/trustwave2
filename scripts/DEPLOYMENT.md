@@ -30,8 +30,8 @@ ssh root@<your-droplet-ip>
 # Update system
 apt update && apt upgrade -y
 
-# Install Node.js 20
-curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+# Install Node.js 22
+curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
 apt install -y nodejs
 
 # Install git
