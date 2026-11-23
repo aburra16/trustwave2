@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils';
 import { LoginArea } from '@/components/auth/LoginArea';
 import { PersonalizeButton } from '@/components/PersonalizeButton';
 import { AudioPlayer } from '@/components/player/AudioPlayer';
+import { BuiltOnBrainstorm } from '@/components/BuiltOnBrainstorm';
 import { usePlayer } from '@/contexts/PlayerContext';
 import { APP_NAME } from '@/lib/constants';
 
@@ -107,13 +108,18 @@ export function MainLayout({ children }: MainLayoutProps) {
       </nav>
       
       {/* Main Content */}
-      <main className={cn(
-        'flex-1 pb-20 md:pb-4',
-        hasCurrentTrack && 'pb-40 md:pb-24'
-      )}>
+      <main className="flex-1">
         {children}
       </main>
-      
+
+      {/* Built on Brainstorm, above the room the mobile nav and the player take */}
+      <footer className={cn(
+        'flex justify-center pt-4 pb-20 md:pb-4',
+        hasCurrentTrack && 'pb-40 md:pb-24'
+      )}>
+        <BuiltOnBrainstorm />
+      </footer>
+
       {/* Audio Player */}
       <AudioPlayer />
     </div>
